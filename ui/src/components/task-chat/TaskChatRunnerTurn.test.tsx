@@ -1552,7 +1552,7 @@ describe("TaskChatRunnerTurn", () => {
     expect(
       container.querySelector('[data-testid="task-chat-turn-status-header"]')
         ?.textContent,
-    ).toContain("Stopped after");
+    ).toContain("Ended early after");
     expect(
       container.querySelector('[data-testid="task-chat-final-response"]')
         ?.textContent,

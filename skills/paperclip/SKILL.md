@@ -124,6 +124,51 @@ Before ending any heartbeat, apply this final-disposition checklist:
 - Delegated follow-up: create the follow-up issue directly, link it with `parentId`/`goalId`, and use blockers when the current issue must wait for that work.
 - Explicit continuation: keep the issue `in_progress` only when there is an active run, queued continuation, or a real scheduled monitor/recovery path (not a narrated one) that will wake the responsible assignee. Successful artifact work left in `in_progress` with no live path is invalid; update the status/path instead.
 
+### Foundation final-deliverable review
+
+Foundation tasks use `reviewPolicy: "human_only"`. When your final deliverable is
+ready, do not create a generic confirmation and do not ask the person to approve
+and then change the task status separately. Create exactly one
+`request_confirmation` whose target identifies it as the native completion
+review:
+
+```json
+POST /api/issues/{issueId}/interactions
+{
+  "kind": "request_confirmation",
+  "idempotencyKey": "completion-review:{issueId}:{finalArtifactRevision}",
+  "resolverPolicy": "human_only",
+  "continuationPolicy": "none",
+  "title": "Review final deliverable",
+  "payload": {
+    "version": 1,
+    "prompt": "Approve this final deliverable?",
+    "acceptLabel": "Approve and complete",
+    "rejectLabel": "Request changes",
+    "rejectRequiresReason": true,
+    "detailsMarkdown": "Put the result, recommendation, producer, cost/time, and evidence link here.",
+    "target": {
+      "type": "custom",
+      "key": "native_completion_review",
+      "revisionId": "{finalArtifactRevision}"
+    }
+  }
+}
+```
+
+Use the final work-product id, attachment id, document revision id, or another
+immutable digest-bound revision as `finalArtifactRevision`; never use a mutable
+label. Then move the issue to `in_review` with the completed result and evidence
+in the comment. Keep that primary comment business-readable: lead with the
+result, risk, recommendation, producer, and a named evidence link. Do not expose
+interaction ids, revision ids, hashes, run ids, or implementation terminology in
+the primary comment; put optional integrity metadata in `detailsMarkdown`, after
+the decision summary, so the UI can keep it secondary and collapsed. Acceptance
+atomically records the human verdict and moves the same issue to `done`;
+rejection returns it for revision. Because the interaction
+itself completes the task, `continuationPolicy` must be `none` and no second
+approval, wake, or manual status change is needed.
+
 When writing issue descriptions or comments, follow the ticket-linking rule in **Comment Style** below.
 
 ```json

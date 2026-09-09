@@ -275,7 +275,9 @@ function targetLabel(
   if (!target) return null;
   const label =
     target.label ??
-    (target.type === "issue_document" ? target.key : target.key);
+    (target.type === "custom" && target.key === "native_completion_review"
+      ? "Final deliverable"
+      : target.key);
   const revision =
     target.revisionNumber == null ? null : `v${target.revisionNumber}`;
   return [label, revision].filter(Boolean).join(" · ");

@@ -53,7 +53,8 @@ describe("TaskChatLiveTail", () => {
       "Looking into the failing test.",
     );
     const phaseSummary = container.querySelector<HTMLButtonElement>('[data-testid="task-chat-phase-summary"]');
-    expect(phaseSummary?.getAttribute("aria-expanded")).toBe("true");
+    expect(phaseSummary?.getAttribute("aria-expanded")).toBe("false");
+    flushSync(() => phaseSummary?.click());
     // Tool row renders with its name + mono target.
     expect(container.textContent).toContain("Read");
     expect(container.textContent).toContain("src/app.ts");
@@ -68,9 +69,10 @@ describe("TaskChatLiveTail", () => {
     render(items);
 
     const phaseSummary = container.querySelector<HTMLButtonElement>('[data-testid="task-chat-phase-summary"]');
-    expect(phaseSummary?.getAttribute("aria-expanded")).toBe("true");
+    expect(phaseSummary?.getAttribute("aria-expanded")).toBe("false");
     expect(container.textContent).not.toContain("const x = 1;");
     expect(container.textContent).not.toContain("+1 −1");
+    flushSync(() => phaseSummary?.click());
 
     const tool = container.querySelector<HTMLButtonElement>(".tc-enter-tool button");
     expect(tool).not.toBeNull();
@@ -111,7 +113,8 @@ describe("TaskChatLiveTail", () => {
       "Here is the real reply.",
     );
     const phaseSummary = container.querySelector<HTMLButtonElement>('[data-testid="task-chat-phase-summary"]');
-    expect(phaseSummary?.getAttribute("aria-expanded")).toBe("true");
+    expect(phaseSummary?.getAttribute("aria-expanded")).toBe("false");
+    flushSync(() => phaseSummary?.click());
     const text = container.textContent ?? "";
     expect(text).toContain("Here is the real reply.");
     expect(text).toContain("pnpm test");
@@ -143,7 +146,9 @@ describe("TaskChatLiveTail", () => {
       '[data-testid="task-chat-phase-summary"]',
     );
     expect(reasoningPhase?.textContent).toContain("Reasoning");
-    expect(reasoningPhase?.getAttribute("aria-expanded")).toBe("true");
+    expect(reasoningPhase?.getAttribute("aria-expanded")).toBe("false");
+    expect(container.textContent).not.toContain("Provider reasoning summary");
+    flushSync(() => reasoningPhase?.click());
 
     expect(container.textContent).toContain("Provider reasoning summary");
     const thinking = container.querySelector('[data-testid="task-chat-thinking"]');
@@ -193,6 +198,12 @@ describe("TaskChatLiveTail", () => {
       )
       .find((item) => item.kind === "tool")?.target;
     render(items);
+
+    const phaseSummary = container.querySelector<HTMLButtonElement>(
+      '[data-testid="task-chat-phase-summary"]',
+    );
+    expect(phaseSummary?.getAttribute("aria-expanded")).toBe("false");
+    flushSync(() => phaseSummary?.click());
 
     const tool = container.querySelector<HTMLButtonElement>(
       ".tc-enter-tool button",

@@ -515,6 +515,8 @@ export interface TaskChatTurnItem {
     removed: number;
     /** e.g. "12.3k tokens" — omitted when unknown. */
     tokensLabel?: string;
+    /** Recorded run cost, including an explicit $0.00 for included runs. */
+    costLabel?: string;
     /** Failed/interrupted turns get a ✗ affordance instead of ✓. */
     failed?: boolean;
   };

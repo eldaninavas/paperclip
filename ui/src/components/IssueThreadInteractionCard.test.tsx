@@ -766,6 +766,25 @@ describe("IssueThreadInteractionCard", () => {
     expect(host.textContent).not.toContain("Approve plan");
   });
 
+  it("presents the native completion target in business language", () => {
+    const host = renderCard({
+      interaction: {
+        ...pendingRequestConfirmationInteraction,
+        payload: {
+          ...pendingRequestConfirmationInteraction.payload,
+          target: {
+            type: "custom",
+            key: "native_completion_review",
+            revisionId: "artifact-revision-1",
+          },
+        },
+      },
+    });
+
+    expect(host.textContent).toContain("Final deliverable");
+    expect(host.textContent).not.toContain("native_completion_review");
+  });
+
   it("renders a jump link for confirmations expired by comment", () => {
     const host = renderCard({
       interaction: commentExpiredRequestConfirmationInteraction,
@@ -849,7 +868,7 @@ describe("IssueThreadInteractionCard", () => {
     expect((resumeFailed.firstElementChild as HTMLElement).className).toContain("border-amber-500/70");
     expect(resumeFailed.textContent).toContain("Approved — agent resume failed");
     expect(resumeFailed.textContent).toContain("Agent resume failed");
-    expect(resumeFailed.textContent).toContain("Paperclip needs attention before the agent can resume this approved work.");
+    expect(resumeFailed.textContent).toContain("Foundation needs attention before the agent can resume this approved work.");
     expect(resumeFailed.textContent).toContain("adapter_failed");
 
     act(() => root?.unmount());

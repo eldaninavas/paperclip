@@ -1654,6 +1654,10 @@ function formatTokensLabel(tokens: number): string | undefined {
   return `${label} tokens`;
 }
 
+function formatRecordedCostLabel(costUsd: number): string {
+  return `Cost $${costUsd.toFixed(2)}`;
+}
+
 /** First→last ts span of a transcript, or undefined when unknowable. */
 function transcriptSpanMs(
   entries: readonly TranscriptEntry[],
@@ -1678,6 +1682,8 @@ export function buildTurnSummary(
   let added = 0;
   let removed = 0;
   let tokens = 0;
+  let recordedCostUsd = 0;
+  let hasRecordedCost = false;
   for (const [i, entry] of entries.entries()) {
     // Each status change of a call logs its own tool_call entry sharing the
     // toolUseId; count unique calls so the folded summary matches the rows the
@@ -1694,6 +1700,10 @@ export function buildTurnSummary(
       // transcript, but they can include earlier runs. Only run-scoped usage
       // belongs in this turn (and therefore in a merged-turn total).
       tokens += (entry.inputTokens || 0) + (entry.outputTokens || 0);
+      if (Number.isFinite(entry.costUsd) && entry.costUsd >= 0) {
+        recordedCostUsd += entry.costUsd;
+        hasRecordedCost = true;
+      }
     }
   }
   const durationMs = opts.durationMs ?? transcriptSpanMs(entries);
@@ -1703,6 +1713,9 @@ export function buildTurnSummary(
     toolCount: toolIds.size,
     added,
     removed,
+    costLabel: hasRecordedCost
+      ? formatRecordedCostLabel(recordedCostUsd)
+      : undefined,
     tokensLabel: formatTokensLabel(tokens),
     failed: opts.failed || undefined,
   };

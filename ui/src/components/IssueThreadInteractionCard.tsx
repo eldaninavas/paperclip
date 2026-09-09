@@ -1477,6 +1477,9 @@ function requestConfirmationTargetLabel(target: RequestConfirmationTarget) {
   if (target.type === "issue_document" && target.key === "plan") {
     return `Plan${revision}`;
   }
+  if (target.type === "custom" && target.key === "native_completion_review") {
+    return "Final deliverable";
+  }
   return `${target.key}${revision}`;
 }
 

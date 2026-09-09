@@ -315,7 +315,7 @@ function RunnerTurnStatus({
   const elapsed = formatCompactDuration(elapsedMs);
 
   const failed = terminalStatusFailed(status);
-  const label = terminal ? (failed ? "Stopped" : "Worked") : "Working";
+  const label = terminal ? (failed ? "Ended early" : "Worked") : "Working";
   const semanticLabel = terminal
     ? elapsed
       ? `${label} ${failed ? "after" : "for"} ${elapsed}`
