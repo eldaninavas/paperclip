@@ -828,6 +828,36 @@ describe("TaskChatInteractionCard", () => {
       "I want to write a normal message.",
     );
   });
+
+  it("hides the native completion key behind a business label", () => {
+    const interaction = createRequestConfirmation({
+      title: "Review final deliverable",
+      payload: {
+        version: 1,
+        prompt: "Approve this final deliverable?",
+        target: {
+          type: "custom",
+          key: "native_completion_review",
+          revisionId: "artifact-revision-1",
+        },
+      },
+    });
+    flushSync(() => {
+      root.render(
+        <TooltipProvider>
+          <ThemeProvider>
+            <TaskChatInteractionCard
+              item={interactionItem(interaction)}
+              presentation="takeover"
+            />
+          </ThemeProvider>
+        </TooltipProvider>,
+      );
+    });
+
+    expect(container.textContent).toContain("Final deliverable");
+    expect(container.textContent).not.toContain("native_completion_review");
+  });
 });
 
 describe("TaskChatThreadView interaction items", () => {

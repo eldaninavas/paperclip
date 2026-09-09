@@ -766,6 +766,25 @@ describe("IssueThreadInteractionCard", () => {
     expect(host.textContent).not.toContain("Approve plan");
   });
 
+  it("presents the native completion target in business language", () => {
+    const host = renderCard({
+      interaction: {
+        ...pendingRequestConfirmationInteraction,
+        payload: {
+          ...pendingRequestConfirmationInteraction.payload,
+          target: {
+            type: "custom",
+            key: "native_completion_review",
+            revisionId: "artifact-revision-1",
+          },
+        },
+      },
+    });
+
+    expect(host.textContent).toContain("Final deliverable");
+    expect(host.textContent).not.toContain("native_completion_review");
+  });
+
   it("renders a jump link for confirmations expired by comment", () => {
     const host = renderCard({
       interaction: commentExpiredRequestConfirmationInteraction,

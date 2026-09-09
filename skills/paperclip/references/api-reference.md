@@ -875,6 +875,42 @@ Use formal approvals for governed actions. Use `request_confirmation` for decisi
 - approving a proposed issue breakdown
 - confirming a configuration or launch choice
 
+For the final deliverable of a Foundation task with `reviewPolicy: "human_only"`,
+use the native completion-review target instead of a generic confirmation:
+
+```json
+{
+  "kind": "request_confirmation",
+  "idempotencyKey": "completion-review:{issueId}:{finalArtifactRevision}",
+  "resolverPolicy": "human_only",
+  "continuationPolicy": "none",
+  "title": "Review final deliverable",
+  "payload": {
+    "version": 1,
+    "prompt": "Approve this final deliverable?",
+    "acceptLabel": "Approve and complete",
+    "rejectLabel": "Request changes",
+    "rejectRequiresReason": true,
+    "detailsMarkdown": "Lead with the result and recommendation, then link the evidence.",
+    "target": {
+      "type": "custom",
+      "key": "native_completion_review",
+      "revisionId": "{finalArtifactRevision}"
+    }
+  }
+}
+```
+
+After creating it, move the issue to `in_review`. Accepting this specific,
+human-only interaction records the verdict and closes the issue atomically;
+rejecting it returns the issue for revision. Use an immutable final work-product,
+attachment, document-revision, or digest id for `revisionId`. Do not wake the
+agent on acceptance and do not require a second manual status transition. Keep
+the primary issue comment non-technical: show the result, risk, recommendation,
+producer, and named evidence link, but no interaction ids, revision ids, hashes,
+or run ids. Put optional integrity metadata after the decision summary inside
+`detailsMarkdown`, where the UI can keep it secondary.
+
 Create a confirmation:
 
 ```json
