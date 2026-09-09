@@ -39,6 +39,7 @@ export function turnSummaryMetrics(
     );
   if (summary.added > 0 || summary.removed > 0)
     parts.push(`+${summary.added} −${summary.removed}`);
+  if (summary.costLabel) parts.push(summary.costLabel);
   if (summary.tokensLabel) parts.push(summary.tokensLabel);
   return parts.join(" · ");
 }
@@ -46,7 +47,7 @@ export function turnSummaryMetrics(
 /** "✓ Worked · 38s · 3 tools · +34 −3 · 12.3k tokens" (parts omitted when unknown). */
 export function turnSummaryText(summary: TaskChatTurnItem["summary"]): string {
   const metrics = turnSummaryMetrics(summary);
-  const label = summary.failed ? "Stopped" : "Worked";
+  const label = summary.failed ? "Ended early" : "Worked";
   return metrics ? `${label} · ${metrics}` : label;
 }
 
@@ -101,9 +102,9 @@ export function TaskChatTurn({
           ) : null}
           <span className="min-w-0 truncate">
             {item.summary.durationLabel
-              ? `${item.summary.failed ? "Stopped" : "Worked"} for ${item.summary.durationLabel}`
+              ? `${item.summary.failed ? "Ended early" : "Worked"} for ${item.summary.durationLabel}`
               : item.summary.failed
-                ? "Stopped"
+                ? "Ended early"
                 : "Worked"}
           </span>
         </div>
@@ -200,9 +201,9 @@ export function TaskChatTurn({
       ) : null}
       <span>
         {item.standaloneHeader && item.summary.durationLabel
-          ? `${item.summary.failed ? "Stopped" : "Worked"} for ${item.summary.durationLabel}`
+          ? `${item.summary.failed ? "Ended early" : "Worked"} for ${item.summary.durationLabel}`
           : item.summary.failed
-            ? "Stopped"
+            ? "Ended early"
             : "Worked"}
       </span>
       {!item.standaloneHeader && turnSummaryMetrics(item.summary) ? (

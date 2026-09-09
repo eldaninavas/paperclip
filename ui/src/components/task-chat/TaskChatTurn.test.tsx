@@ -75,10 +75,10 @@ describe("turnSummaryText", () => {
     );
   });
 
-  it("labels failed turns Stopped", () => {
+  it("labels failed turns without implying the whole task stopped", () => {
     expect(
       turnSummaryText({ toolCount: 0, added: 0, removed: 0, failed: true }),
-    ).toBe("Stopped");
+    ).toBe("Ended early");
   });
 });
 
@@ -121,6 +121,7 @@ describe("buildTurnSummary", () => {
     expect(summary.added).toBe(1);
     expect(summary.removed).toBe(1);
     expect(summary.tokensLabel).toBe("12.3k tokens");
+    expect(summary.costLabel).toBe("Cost $0.01");
     expect(summary.durationLabel).toBe("38s");
   });
 
@@ -128,6 +129,25 @@ describe("buildTurnSummary", () => {
     const summary = buildTurnSummary([], { durationMs: 95_000, failed: true });
     expect(summary.durationLabel).toBe("1m 35s");
     expect(summary.failed).toBe(true);
+  });
+
+  it("shows an explicit zero recorded cost instead of hiding it", () => {
+    const summary = buildTurnSummary([
+      {
+        kind: "result",
+        ts: "2026-07-29T10:00:00Z",
+        text: "done",
+        inputTokens: 10,
+        outputTokens: 2,
+        cachedTokens: 0,
+        costUsd: 0,
+        subtype: "paperclip_runner_usage",
+        isError: false,
+        errors: [],
+      },
+    ]);
+
+    expect(summary.costLabel).toBe("Cost $0.00");
   });
 });
 
