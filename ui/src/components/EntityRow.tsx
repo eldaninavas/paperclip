@@ -63,8 +63,8 @@ export function EntityRow({
   const shellClasses = cn(
     // When a secondaryRow is present the shell stacks (main line + secondary
     // line); otherwise the shell itself is the single flex row.
-    secondaryRow ? "block" : "flex items-center gap-3",
-    "px-4 py-2 text-sm border-b border-border last:border-b-0 transition-colors",
+    secondaryRow ? "block" : "flex items-center gap-2.5",
+    "px-4 py-1.5 text-(length:--text-compact) border-b border-border/70 last:border-b-0 transition-colors",
     isClickable && "cursor-pointer hover:bg-accent/50",
     selected && "bg-accent/30",
     className
@@ -128,7 +128,7 @@ export function EntityRow({
   // leading capsule). Without it, `content` is rendered directly (unchanged).
   const body = secondaryRow ? (
     <>
-      <div className="flex items-center gap-3">{content}</div>
+      <div className="flex items-center gap-2.5">{content}</div>
       <div className="mt-1 pl-5">{secondaryRow}</div>
     </>
   ) : (
@@ -137,14 +137,24 @@ export function EntityRow({
 
   if (to) {
     return (
-      <Link to={to} className={cn("no-underline text-inherit", shellClasses)} onClick={onClick}>
+      <Link
+        data-slot="entity-row"
+        to={to}
+        className={cn("no-underline text-inherit", shellClasses)}
+        onClickCapture={(event) => {
+          if ((event.target as HTMLElement).closest("[data-entity-row-action='true']")) {
+            event.preventDefault();
+          }
+        }}
+        onClick={onClick}
+      >
         {body}
       </Link>
     );
   }
 
   return (
-    <div className={shellClasses} onClick={onClick}>
+    <div data-slot="entity-row" className={shellClasses} onClick={onClick}>
       {body}
     </div>
   );

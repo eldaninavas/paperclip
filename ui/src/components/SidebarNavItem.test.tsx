@@ -98,17 +98,17 @@ describe("SidebarNavItem", () => {
     expect(link().firstElementChild?.textContent).toBe("Recent task");
   });
 
-  it("uses the Paper nav surface for the active item", () => {
+  it("uses the Foundation nav surface for the active item", () => {
     render(<SidebarNavItem to="/issues" label="Tasks" icon={Inbox} active />);
 
-    expect(classTokens(link())).toContain("bg-background");
+    expect(classTokens(link())).toContain("bg-(--foundation-sidebar-selected)");
     expect(classTokens(link())).not.toContain("bg-accent");
   });
 
   it("uses the active nav surface for hover", () => {
     render(<SidebarNavItem to="/issues" label="Tasks" icon={Inbox} />);
 
-    expect(classTokens(link())).toContain("hover:bg-background");
+    expect(classTokens(link())).toContain("hover:bg-(--foundation-sidebar-hover)");
     expect(classTokens(link())).not.toContain("hover:bg-accent/50");
   });
 
@@ -182,6 +182,18 @@ describe("SidebarNavItem", () => {
     expect(container.textContent).toContain("28");
     expect(link().getAttribute("aria-label")).toBeNull();
     expect(link().parentElement?.getAttribute("data-slot")).not.toBe("tooltip-trigger");
+  });
+
+  it("uses semantic light and dark surfaces inside contextual panes", () => {
+    render(
+      <SidebarNavExpandedProvider>
+        <SidebarNavItem to="/agents/one/overview" label="Overview" icon={Inbox} active />
+      </SidebarNavExpandedProvider>,
+    );
+
+    expect(classTokens(link())).toContain("bg-accent");
+    expect(classTokens(link())).toContain("text-accent-foreground");
+    expect(classTokens(link())).not.toContain("bg-(--foundation-sidebar-selected)");
   });
 
   it("surfaces the live count in the rail aria-label", () => {

@@ -7,6 +7,8 @@ export const typeLabel: Record<string, string> = {
   approve_ceo_strategy: "CEO Strategy",
   budget_override_required: "Budget Override",
   request_board_approval: "Board Approval",
+  assurance_task_validation: "Assurance de tarea",
+  assurance_dossier_manifest: "Cierre de dossier Assurance",
 };
 
 function firstNonEmptyString(...values: unknown[]): string | null {
@@ -247,6 +249,14 @@ export function ApprovalPayloadRenderer({
   payload: Record<string, unknown>;
   hidePrimaryTitle?: boolean;
 }) {
+  if (type === "assurance_task_validation" || type === "assurance_dossier_manifest") {
+    return (
+      <div className="space-y-2 text-sm">
+        <p className="text-muted-foreground">{String(payload.statement ?? "Aprueba únicamente esta huella exacta de evidencia.")}</p>
+        <PayloadField label="SHA-256" value={payload.inputDigest} />
+      </div>
+    );
+  }
   if (type === "hire_agent") return <HireAgentPayload payload={payload} />;
   if (type === "budget_override_required") return <BudgetOverridePayload payload={payload} />;
   if (type === "request_board_approval") {

@@ -505,7 +505,7 @@ export interface TaskChatTurnItem {
   animateFold?: boolean;
   /** New-runner turns keep Worked/Stopped fixed above their ordered timeline. */
   standaloneHeader?: boolean;
-  /** Durable response shown after the ordered Paperclip Runner timeline. */
+  /** Durable response shown after the ordered Foundation Runner timeline. */
   finalResponse?: TaskChatMessageItem;
   summary: {
     /** e.g. "38s" — omitted when unknown. */

@@ -3,15 +3,18 @@ import { NavLink, useLocation } from "@/lib/router";
 import {
   House,
   CircleDot,
+  Box,
+  ShieldCheck,
   SquarePen,
   Users,
-  Inbox,
 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import { useCompany } from "../context/CompanyContext";
-import { useDialogActions } from "../context/DialogContext";
+import { approvalsApi } from "../api/approvals";
+import { issuesApi } from "../api/issues";
+import { queryKeys } from "../lib/queryKeys";
 import { SIDEBAR_SCROLL_RESET_STATE } from "../lib/navigation-scroll";
 import { cn } from "../lib/utils";
-import { useInboxBadge } from "../hooks/useInboxBadge";
 import { Badge } from "@/components/ui/badge";
 
 interface MobileBottomNavProps {
@@ -38,24 +41,36 @@ type MobileNavItem = MobileNavLinkItem | MobileNavActionItem;
 export function MobileBottomNav({ visible }: MobileBottomNavProps) {
   const location = useLocation();
   const { selectedCompanyId } = useCompany();
-  const { openNewIssue } = useDialogActions();
-  const inboxBadge = useInboxBadge(selectedCompanyId);
+  // Same cache key as the Approvals page and the sidebar badge — no extra request.
+  const { data: approvals } = useQuery({
+    queryKey: queryKeys.approvals.list(selectedCompanyId!),
+    queryFn: () => approvalsApi.list(selectedCompanyId!),
+    enabled: !!selectedCompanyId,
+  });
+  const pendingApprovalCount = (approvals ?? []).filter(
+    (approval) => approval.status === "pending",
+  ).length;
+  const { data: issuesInReview } = useQuery({
+    queryKey: [...queryKeys.issues.list(selectedCompanyId!), "in-review"],
+    queryFn: () => issuesApi.list(selectedCompanyId!, { status: "in_review" }),
+    enabled: !!selectedCompanyId,
+  });
+  const humanReviewCount = pendingApprovalCount + (issuesInReview?.length ?? 0);
 
   const items = useMemo<MobileNavItem[]>(
     () => [
-      { type: "link", to: "/dashboard", label: "Home", icon: House },
-      { type: "link", to: "/issues", label: "Tasks", icon: CircleDot },
-      { type: "action", label: "Create", icon: SquarePen, onClick: () => openNewIssue() },
-      { type: "link", to: "/agents/all", label: "Agents", icon: Users },
       {
         type: "link",
-        to: "/inbox",
-        label: "Inbox",
-        icon: Inbox,
-        badge: inboxBadge.inbox,
+        to: "/approvals",
+        label: "Revisión",
+        icon: ShieldCheck,
+        badge: humanReviewCount,
       },
+      { type: "link", to: "/projects", label: "Proyectos", icon: Box },
+      { type: "link", to: "/issues", label: "Tareas", icon: CircleDot },
+      { type: "link", to: "/agents", label: "Agentes", icon: Users },
     ],
-    [openNewIssue, inboxBadge.inbox],
+    [humanReviewCount],
   );
 
   return (
@@ -66,7 +81,7 @@ export function MobileBottomNav({ visible }: MobileBottomNavProps) {
       )}
       aria-label="Mobile navigation"
     >
-      <div className="grid h-16 grid-cols-5 px-1">
+      <div className="grid h-16 grid-cols-4 px-1">
         {items.map((item) => {
           if (item.type === "action") {
             const Icon = item.icon;

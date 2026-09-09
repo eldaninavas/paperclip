@@ -93,8 +93,10 @@ interface MarkdownEditorProps {
   bordered?: boolean;
   /** List of mentionable entities. Enables @-mention autocomplete. */
   mentions?: MentionOption[];
-  /** Called on Cmd/Ctrl+Enter */
+  /** Called on Cmd/Ctrl+Enter, or plain Enter when submitOnEnter is enabled. */
   onSubmit?: () => void;
+  /** Submit with plain Enter; Shift+Enter continues to insert a newline. */
+  submitOnEnter?: boolean;
   /** Render the rich editor without allowing edits. */
   readOnly?: boolean;
 }
@@ -693,6 +695,7 @@ export const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>
   bordered = true,
   mentions,
   onSubmit,
+  submitOnEnter = false,
   readOnly = false,
 }: MarkdownEditorProps, forwardedRef) {
   const editorValue = useMemo(() => prepareMarkdownForEditor(value), [value]);
@@ -1304,7 +1307,16 @@ export const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>
           }}
           onBlur={() => onBlur?.()}
           onKeyDown={(event) => {
-            if (onSubmit && event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+            const isSubmitKey =
+              event.key === "Enter" &&
+              !event.nativeEvent.isComposing &&
+              ((event.metaKey || event.ctrlKey) ||
+                (submitOnEnter &&
+                  !event.shiftKey &&
+                  !event.metaKey &&
+                  !event.ctrlKey &&
+                  !event.altKey));
+            if (onSubmit && isSubmitKey) {
               event.preventDefault();
               onSubmit();
             }
@@ -1329,8 +1341,19 @@ export const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>
       )}
       onKeyDownCapture={(e) => {
         if (readOnly) return;
-        // Cmd/Ctrl+Enter to submit
-        if (onSubmit && e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+        // Cmd/Ctrl+Enter always submits. Chat-style consumers can also opt
+        // into plain Enter, while Shift+Enter remains available for newlines.
+        const isSubmitKey =
+          e.key === "Enter" &&
+          !e.nativeEvent.isComposing &&
+          ((e.metaKey || e.ctrlKey) ||
+            (submitOnEnter &&
+              !mentionActive &&
+              !e.shiftKey &&
+              !e.metaKey &&
+              !e.ctrlKey &&
+              !e.altKey));
+        if (onSubmit && isSubmitKey) {
           e.preventDefault();
           e.stopPropagation();
           onSubmit();

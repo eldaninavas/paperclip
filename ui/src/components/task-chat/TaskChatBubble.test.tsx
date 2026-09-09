@@ -183,12 +183,11 @@ describe("TaskChatBubble accent-bubble text color", () => {
     );
   }
 
-  it("marks the human bubble's markdown as on-accent so prose text follows text-white", () => {
+  it("keeps the neutral human bubble on default prose colors", () => {
     render({ id: "m1", kind: "message", author: "human", text: "when a new task is created…" });
     const body = container.querySelector(".paperclip-markdown");
     expect(body).not.toBeNull();
-    // Without this class the light-mode prose body color reads as black on blue.
-    expect(body?.className).toContain("paperclip-markdown-on-accent");
+    expect(body?.className).not.toContain("paperclip-markdown-on-accent");
   });
 
   it("leaves the neutral agent bubble on default prose colors", () => {

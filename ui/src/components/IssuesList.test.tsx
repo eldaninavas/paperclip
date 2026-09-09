@@ -530,6 +530,11 @@ describe("IssuesList", () => {
 
     await waitForAssertion(() => {
       expect(container.querySelector("[role='toolbar'][aria-label='Task controls']")).not.toBeNull();
+      const controls = container.querySelector("[data-slot='collection-toolbar-controls']");
+      expect(controls?.querySelectorAll(":scope > button, :scope > [data-slot='popover'] > button")).toHaveLength(2);
+      expect(controls?.querySelector('button[title="Filter"]')).not.toBeNull();
+      expect(controls?.querySelector('button[title="View options"]')).not.toBeNull();
+      expect(controls?.querySelector('button[title="Switch to board"]')).toBeNull();
     });
 
     act(() => root.unmount());

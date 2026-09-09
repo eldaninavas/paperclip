@@ -23,6 +23,8 @@ import { redactEventPayload } from "../redaction.js";
 import type { PluginWorkerManager } from "../services/plugin-worker-manager.js";
 import { issueService } from "../services/issues.js";
 import { REVIEW_PATH_RECOVERY_INSTRUCTION } from "../services/recovery/review-path-recovery.js";
+import { markAssuranceTaskStale } from "../services/assurance/task-validator.js";
+import { signalAssuranceJob } from "../services/assurance/reconciler.js";
 
 function redactApprovalPayload<T extends { payload: Record<string, unknown> }>(approval: T): T {
   return {
@@ -394,6 +396,19 @@ export function approvalRoutes(
           : null,
         requestedByUserId: req.actor.userId ?? "board",
       });
+      if (approval.type === "assurance_task_validation") {
+        const issueIds = linkedIssues.map((issue) => issue.id);
+        await markAssuranceTaskStale(db, approval.companyId, issueIds);
+        for (const issue of linkedIssues) {
+          await signalAssuranceJob({
+            db,
+            companyId: approval.companyId,
+            kind: "task_validate",
+            dedupeKey: `approval:${approval.id}:${approval.status}:${issue.id}`,
+            payload: { issueId: issue.id },
+          });
+        }
+      }
     }
 
     res.json(redactApprovalPayload(approval));
@@ -429,6 +444,19 @@ export function approvalRoutes(
         lostIssueIds: lostReviewIssueIds,
         requestedByUserId: req.actor.userId ?? "board",
       });
+      if (approval.type === "assurance_task_validation") {
+        const issueIds = linkedIssues.map((issue) => issue.id);
+        await markAssuranceTaskStale(db, approval.companyId, issueIds);
+        for (const issue of linkedIssues) {
+          await signalAssuranceJob({
+            db,
+            companyId: approval.companyId,
+            kind: "task_validate",
+            dedupeKey: `approval:${approval.id}:${approval.status}:${issue.id}`,
+            payload: { issueId: issue.id },
+          });
+        }
+      }
     }
 
     res.json(redactApprovalPayload(approval));

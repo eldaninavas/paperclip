@@ -4,6 +4,7 @@ import type { AgentPermissions } from "@paperclipai/shared";
 
 export function buildNewAgentHirePayload(input: {
   name: string;
+  icon?: string | null;
   effectiveRole: string;
   title?: string;
   reportsTo?: string | null;
@@ -14,6 +15,7 @@ export function buildNewAgentHirePayload(input: {
 }) {
   const {
     name,
+    icon,
     effectiveRole,
     title,
     reportsTo,
@@ -25,6 +27,7 @@ export function buildNewAgentHirePayload(input: {
 
   return {
     name: name.trim(),
+    ...(icon ? { icon } : {}),
     role: effectiveRole,
     ...(title?.trim() ? { title: title.trim() } : {}),
     ...(reportsTo ? { reportsTo } : {}),

@@ -237,7 +237,7 @@ export function OpenClawGatewayConfigFields({
             }
             immediate
             className={inputClass}
-            placeholder="paperclip"
+            placeholder="foundation"
           />
         </Field>
       )}
@@ -307,7 +307,7 @@ export function OpenClawGatewayConfigFields({
         mark={mark}
       />
 
-      <Field label="Paperclip API URL override">
+      <Field label="Foundation API URL override">
         <DraftInput
           value={
             isCreate
@@ -321,7 +321,7 @@ export function OpenClawGatewayConfigFields({
           }
           immediate
           className={inputClass}
-          placeholder="https://paperclip.example"
+          placeholder="https://foundation.example"
         />
       </Field>
 
@@ -379,7 +379,7 @@ export function OpenClawGatewayConfigFields({
             onCommit={(v) => mark("adapterConfig", "claimedApiKeyPath", v || undefined)}
             immediate
             className={inputClass}
-            placeholder="~/.openclaw/workspace/paperclip-claimed-api-key.json"
+            placeholder="~/.openclaw/workspace/foundation-claimed-api-key.json"
           />
         </Field>
       )}
@@ -448,7 +448,7 @@ export function OpenClawGatewayConfigFields({
 
       <Field label="Device auth">
         <div className="text-xs text-muted-foreground leading-relaxed">
-          When enabled, Paperclip persists a device key during onboarding so pairing approvals
+          When enabled, Foundation persists a device key during onboarding so pairing approvals
           remain stable across runs.
         </div>
       </Field>

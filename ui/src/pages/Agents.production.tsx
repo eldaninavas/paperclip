@@ -12,8 +12,9 @@ import { useBreadcrumbs } from "../context/BreadcrumbContext";
 import { useSidebar } from "../context/SidebarContext";
 import { queryKeys } from "../lib/queryKeys";
 import { isPlatformManagedEnvironment } from "../lib/managed-sandbox-environment";
-import { AgentStatusBadge, AgentStatusCapsule } from "../components/StatusBadge";
+import { AgentStatusBadge } from "../components/StatusBadge";
 import { AgentActionButtons } from "../components/AgentActionButtons";
+import { AgentIcon } from "../components/AgentIconPicker";
 import { MembershipAction } from "../components/MembershipAction";
 import { StarToggle } from "../components/StarToggle";
 import { EntityRow } from "../components/EntityRow";
@@ -69,8 +70,8 @@ interface EnvironmentDescriptor {
 
 const localEnvironmentDescriptor: EnvironmentDescriptor = {
   label: "Local",
-  detail: "Paperclip host",
-  title: "Local - Paperclip host",
+  detail: "Foundation host",
+  title: "Local - Foundation host",
 };
 
 const loadingEnvironmentDescriptor: EnvironmentDescriptor = {
@@ -131,11 +132,11 @@ function describeEnvironment(
   capabilities?: EnvironmentCapabilities | null,
 ): EnvironmentDescriptor {
   const detail = isPlatformManagedEnvironment(environment)
-    ? "Managed by Paperclip"
+    ? "Managed by Foundation"
     : environment.driver === "sandbox"
       ? `${getSandboxProviderLabel(environment, capabilities)} sandbox provider`
       : environment.driver === "local"
-        ? "Paperclip host"
+        ? "Foundation host"
         : formatEnvironmentDriver(environment.driver);
 
   return {
@@ -403,7 +404,7 @@ export function Agents() {
         leading={hasInvalidOrgChain ? (
           <AlertTriangle className="h-3.5 w-3.5 text-amber-500" aria-label="Invalid reporting chain" />
         ) : (
-          <AgentStatusCapsule status={agent.status} />
+          <AgentIcon icon={agent.icon} status={agent.status} className="size-6 shrink-0" />
         )}
         secondaryRow={
           builtInCluster ? (
@@ -672,7 +673,7 @@ function OrgTreeNode({
         {hasInvalidOrgChain ? (
           <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-500" aria-label="Invalid reporting chain" />
         ) : (
-          <AgentStatusCapsule status={node.status} />
+          <AgentIcon icon={agent?.icon} status={node.status} className="size-6 shrink-0" />
         )}
         <div className="flex-1 min-w-0 flex flex-wrap items-center gap-2">
           {/* Name floor + `truncate` keeps the primary identifier readable; the

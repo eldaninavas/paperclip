@@ -77,7 +77,11 @@ export const createAgentSchema = z.object({
   name: z.string().min(1),
   role: z.enum(AGENT_ROLES).optional().default("general"),
   title: z.string().optional().nullable(),
-  icon: z.enum(AGENT_ICON_NAMES).optional().nullable(),
+  icon: z.string().trim().min(1).max(160).refine(
+    (value) => AGENT_ICON_NAMES.includes(value as (typeof AGENT_ICON_NAMES)[number]) ||
+      /^agent:v1:(circle|oval|square|pill|triangle|hexagon|cloud|drop):(mint|blue|violet|pink|red|orange|gold|green|sky|slate):(bright|calm|focused|curious):(none|tuft|antenna|spark)$/.test(value),
+    { message: "Invalid agent identity" },
+  ).optional().nullable(),
   reportsTo: z.string().guid().optional().nullable(),
   capabilities: z.string().optional().nullable(),
   desiredSkills: z.array(agentDesiredSkillSelectionSchema).optional(),

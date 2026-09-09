@@ -797,7 +797,7 @@ export function ProjectProperties({ project, onUpdate, onFieldUpdate, getFieldSa
             */}
             {hideHostPaths ? (
               codebase.origin === "managed_checkout" ? (
-                <div className="text-(length:--text-micro) text-muted-foreground">Paperclip-managed folder.</div>
+                <div className="text-(length:--text-micro) text-muted-foreground">Foundation-managed folder.</div>
               ) : null
             ) : (
               <div className="space-y-1">
@@ -808,7 +808,7 @@ export function ProjectProperties({ project, onUpdate, onFieldUpdate, getFieldSa
                       {codebase.effectiveLocalFolder}
                     </div>
                     {codebase.origin === "managed_checkout" && (
-                      <div className="text-(length:--text-micro) text-muted-foreground">Paperclip-managed folder.</div>
+                      <div className="text-(length:--text-micro) text-muted-foreground">Foundation-managed folder.</div>
                     )}
                   </div>
                   <div className="flex items-center gap-1">
@@ -841,7 +841,7 @@ export function ProjectProperties({ project, onUpdate, onFieldUpdate, getFieldSa
 
             {hasAdditionalLegacyWorkspaces && (
               <div className="text-(length:--text-micro) text-muted-foreground">
-                Additional legacy workspace records exist on this project. Paperclip is using the primary workspace as the codebase view.
+                Additional legacy workspace records exist on this project. Foundation is using the primary workspace as the codebase view.
               </div>
             )}
 
@@ -1216,7 +1216,7 @@ export function ProjectProperties({ project, onUpdate, onFieldUpdate, getFieldSa
                               })}
                             immediate
                             className="w-full rounded border border-border bg-transparent px-2 py-1 text-xs font-mono outline-none"
-                            placeholder=".paperclip/worktrees"
+                            placeholder=".foundation/worktrees"
                           />
                         </div>
                         <div>

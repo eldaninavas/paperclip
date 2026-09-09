@@ -9,6 +9,7 @@ import {
 } from "@/components/ImageGalleryModal";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { AgentIcon } from "@/components/AgentIconPicker";
+import { parseAgentIdentity } from "@/components/AgentIdentity";
 import { CommentAttributionChip } from "@/components/CommentAttributionChip";
 import {
   Attachment,
@@ -73,30 +74,42 @@ export function TaskChatAgentIdentity({
   agentName,
   agentIcon,
   onBehalfOfUserName,
+  status,
 }: {
   agentName: string;
   agentIcon?: string | null;
   onBehalfOfUserName?: string;
+  status?: string | null;
 }) {
+  const hasCharacterIdentity = Boolean(parseAgentIdentity(agentIcon));
   return (
     <span
-      className="flex items-center gap-2 px-1"
+      className="flex items-center gap-1.5 px-1"
       data-testid="task-chat-agent-identity"
     >
-      <Avatar
-        size="sm"
-        className="shrink-0"
-        data-testid="task-chat-agent-avatar"
-      >
-        {agentIcon ? (
+      {hasCharacterIdentity ? (
+        <span
+          className="flex size-6 shrink-0 items-center justify-center"
+          data-testid="task-chat-agent-avatar"
+        >
+          <AgentIcon icon={agentIcon} status={status} className="size-6" />
+        </span>
+      ) : (
+        <Avatar
+          size="xs"
+          className="shrink-0"
+          data-testid="task-chat-agent-avatar"
+        >
+          {agentIcon ? (
           <AvatarFallback>
-            <AgentIcon icon={agentIcon} className="h-3.5 w-3.5" />
+            <AgentIcon icon={agentIcon} status={status} className="h-3.5 w-3.5" />
           </AvatarFallback>
-        ) : (
-          <AvatarFallback>{initialsForName(agentName)}</AvatarFallback>
-        )}
-      </Avatar>
-      <span className="text-sm font-semibold text-foreground">{agentName}</span>
+          ) : (
+            <AvatarFallback>{initialsForName(agentName)}</AvatarFallback>
+          )}
+        </Avatar>
+      )}
+      <span className="text-xs font-medium text-foreground/90">{agentName}</span>
       {onBehalfOfUserName ? (
         <CommentAttributionChip
           agentName={agentName}
@@ -109,7 +122,7 @@ export function TaskChatAgentIdentity({
 
 /**
  * Author-typed message row — the primary legibility signal. Human messages sit
- * right in a solid accent bubble; agent messages sit directly on the page
+ * right in a quiet neutral bubble; agent messages sit directly on the page
  * surface with an avatar author header (the agent's assigned icon + name);
  * system notices are centered and recede.
  */
@@ -219,20 +232,13 @@ export function TaskChatBubble({
             isHuman ? "task-chat-human-bubble" : "task-chat-agent-bubble"
           }
           className={cn(
-            "break-words py-2 text-sm",
+            "break-words py-2 text-[13px] leading-5",
             isHuman
-              ? "max-w-(--pct-85) rounded-2xl rounded-br-sm bg-(--liveness-blue) px-3.5 text-white"
+              ? "max-w-(--pct-72) rounded-xl rounded-br-sm bg-muted px-3 text-foreground ring-1 ring-border/60"
               : "w-full bg-transparent px-1 text-foreground",
           )}
         >
           <MarkdownBody
-            // The human bubble sits on the solid --liveness-blue accent, so the
-            // prose body text must follow the bubble's `text-white` rather than
-            // the default light-mode prose color (which reads as black on blue).
-            // `paperclip-markdown-on-accent` flips prose tokens to currentColor
-            // (== inherited white) in both themes; dark mode was already correct
-            // only because `prose-invert` happened to lighten the text.
-            className={isHuman ? "paperclip-markdown-on-accent" : undefined}
             softBreaks
             linkIssueReferences
             onImageClick={setLightboxSrc}

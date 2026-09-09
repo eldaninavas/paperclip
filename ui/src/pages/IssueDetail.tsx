@@ -204,6 +204,7 @@ import { computePauseAffectsSummary } from "../lib/interrupt-handoff";
 import { useIssueExternalObjects } from "../hooks/useIssueExternalObjects";
 import { useIssuePlanDocument } from "../hooks/useIssuePlanDocument";
 import { IssueRunLedger } from "../components/IssueRunLedger";
+import { AssuranceTaskPanel } from "../components/assurance/AssuranceTaskPanel";
 import { IssueWorkspaceCard } from "../components/IssueWorkspaceCard";
 import type { MentionOption } from "../components/MarkdownEditor";
 import {
@@ -300,7 +301,7 @@ import {
   MoreHorizontal,
   MoreVertical,
   PauseCircle,
-  Paperclip,
+  Paperclip as Foundation,
   PlayCircle,
   Plus,
   Repeat,
@@ -406,9 +407,7 @@ function buildPlanDecisionResponseText(
   return reason ? `Requested changes\n\n${reason}` : "Requested changes";
 }
 
-const FEEDBACK_TERMS_URL =
-  import.meta.env.VITE_FEEDBACK_TERMS_URL?.trim() ||
-  "https://paperclip.ing/tos";
+const FEEDBACK_TERMS_URL = import.meta.env.VITE_FEEDBACK_TERMS_URL?.trim() || "";
 const ISSUE_COMMENT_AUTOLOAD_LIMIT = ISSUE_COMMENT_PAGE_SIZE * 3;
 const JUMP_TO_LATEST_MAX_COMMENT_PAGES = 10;
 const TREE_CONTROL_MODE_LABEL: Record<IssueTreeControlMode, string> = {
@@ -1475,7 +1474,7 @@ const IssueDetailChatTab = memo(function IssueDetailChatTab({
     null;
   // Do not briefly enable runner-only queue traffic from the current assignee
   // while the authoritative active-run lookup is still loading. A task can be
-  // reassigned to a Paperclip Runner agent while an existing direct-adapter
+  // reassigned to a Foundation Runner agent while an existing direct-adapter
   // run remains active; that legacy run must never create or poll native queue
   // state.
   const runtimeSelectionKnown =
@@ -2087,7 +2086,7 @@ const IssueDetailChatTab = memo(function IssueDetailChatTab({
         if (code === "queued_comment_already_dispatching") {
           pushToast({
             title: "Message is already being sent",
-            body: "The continuation started before the discard was confirmed, so Paperclip could not unsend it.",
+            body: "The continuation started before the discard was confirmed, so Foundation could not unsend it.",
             tone: "error",
             ttlMs: 15_000,
             dedupeKey: `queued-comment-already-dispatching:${issueId}:${commentId}`,
@@ -6480,7 +6479,7 @@ export function IssueDetail() {
           attachmentDragActive && "border-primary bg-primary/5",
         )}
       >
-        <Paperclip className="h-3.5 w-3.5 mr-1.5" />
+        <Foundation className="h-3.5 w-3.5 mr-1.5" />
         {uploadAttachment.isPending || importMarkdownDocument.isPending ? (
           "Uploading..."
         ) : (
@@ -6545,7 +6544,7 @@ export function IssueDetail() {
   const issueHeaderBlock = (
       <div
         data-testid="issue-detail-header"
-        className={cn(streamlinedTaskDetailEnabled ? "relative space-y-2" : "space-y-3", shellSectionClass)}
+        className={cn(streamlinedTaskDetailEnabled ? "relative space-y-1.5" : "space-y-3", shellSectionClass)}
       >
         {streamlinedTaskDetailEnabled ? (
           <div className="flex min-w-0 items-center gap-2 pr-8">
@@ -6555,11 +6554,11 @@ export function IssueDetail() {
                 value={issue.title}
                 onSave={(title) => updateIssue.mutateAsync({ title })}
                 as="h2"
-                className="min-w-0 text-xl font-semibold leading-normal text-balance"
+                className="min-w-0 text-base font-medium leading-6 text-balance"
               />
               <span
                 data-slot="task-title-identifier"
-                className="shrink-0 font-mono text-sm text-muted-foreground"
+                className="shrink-0 font-mono text-xs text-muted-foreground/80"
               >
                 {issue.identifier ?? issue.id.slice(0, 8)}
               </span>
@@ -6570,7 +6569,7 @@ export function IssueDetail() {
         <div
           className={cn(
             "flex min-w-0 flex-wrap items-center gap-2",
-            streamlinedTaskDetailEnabled && "gap-x-6 gap-y-2 pl-7",
+            streamlinedTaskDetailEnabled && "gap-x-4 gap-y-1.5 pl-6",
           )}
         >
           {!streamlinedTaskDetailEnabled ? issueStatusControl : null}
@@ -7367,6 +7366,8 @@ export function IssueDetail() {
           </div>
         );
       })()}
+
+      <AssuranceTaskPanel issueId={issue.id} />
 
       {taskChatShellEnabled ? null : <Separator className={shellSectionClass} />}
 

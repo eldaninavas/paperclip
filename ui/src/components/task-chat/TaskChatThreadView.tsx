@@ -287,11 +287,11 @@ export function taskChatItemSpacingClass(
   if (!previousItem) return undefined;
   const currentIsSystemLike = isSystemLikeItem(item);
   const previousIsSystemLike = isSystemLikeItem(previousItem);
-  if (currentIsSystemLike && previousIsSystemLike) return "mt-2";
-  if (currentIsSystemLike || previousIsSystemLike) return "mt-3";
+  if (currentIsSystemLike && previousIsSystemLike) return "mt-1.5";
+  if (currentIsSystemLike || previousIsSystemLike) return "mt-2.5";
   if (item.kind === "turn" || previousItem.kind === "turn") return "mt-3";
-  if (item.kind === "interaction" || previousItem.kind === "interaction") return "mt-4";
-  return "mt-6";
+  if (item.kind === "interaction" || previousItem.kind === "interaction") return "mt-3.5";
+  return "mt-4";
 }
 
 /**
@@ -356,14 +356,14 @@ export function TaskChatThreadView({
   const body = (
     <div
       className={cn(
-        "mx-auto flex w-full max-w-(--tc-shell-max-w) flex-col px-4 py-4",
+        "mx-auto flex w-full max-w-(--tc-shell-max-w) flex-col px-4 py-3",
         streamlined ? "md:px-0" : "gap-5",
         className,
       )}
     >
       {header ? (
         <div
-          className={cn("flex flex-col gap-6", streamlined ? "pb-4" : "pb-2")}
+          className={cn("flex flex-col gap-3", streamlined ? "pb-3" : "pb-2")}
           data-testid="task-chat-thread-header"
           >
             {header}

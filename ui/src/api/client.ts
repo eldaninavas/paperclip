@@ -30,7 +30,7 @@ function abortError(): DOMException {
  * these as scheduling/telemetry only and never as security signals.
  */
 function applyObservabilityHeaders(headers: Headers) {
-  if (headers.has("X-Paperclip-Tab-Visible")) return; // caller override wins
+  if (headers.has("X-Paperclip-Tab-Visible")) return; // legacy wire contract; caller override wins
   const visibility = getPageVisibility();
   headers.set("X-Paperclip-Tab-Visible", getVisibilityHeaderValue(visibility));
   if (typeof window !== "undefined" && window.location) {
@@ -53,8 +53,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   });
   if (!res.ok) {
     const errorBody = await res.json().catch(() => null);
+    const rawMessage = (errorBody as { error?: string } | null)?.error ?? `Request failed: ${res.status}`;
     throw new ApiError(
-      (errorBody as { error?: string } | null)?.error ?? `Request failed: ${res.status}`,
+      rawMessage.replaceAll("Paperclip", "Foundation").replaceAll("paperclip", "Foundation"),
       res.status,
       errorBody,
     );

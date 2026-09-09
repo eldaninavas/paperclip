@@ -20,6 +20,8 @@ import {
   MessagesSquare,
   GanttChartSquare,
   LayoutGrid,
+  Box,
+  ShieldCheck,
 } from "lucide-react";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -180,7 +182,14 @@ export function Sidebar() {
         </div>
 
         <SidebarSection label="Work" collapsible={{ open: workOpen, onOpenChange: setWorkOpen }}>
+          {streamlined ? (
+            <>
+              <SidebarNavItem to="/projects" label="Projects" icon={Box} />
+              <SidebarStarredProjects />
+            </>
+          ) : null}
           <SidebarNavItem to="/issues" label="Tasks" icon={CircleDot} />
+          <SidebarNavItem to="/assurance" label="Assurance" icon={ShieldCheck} />
           {showCases ? (
             <SidebarNavItem to="/cases" label="Cases" icon={Layers} textBadge="beta" />
           ) : null}
@@ -201,12 +210,6 @@ export function Sidebar() {
           <SidebarNavItem to="/skills" label="Skills" icon={Boxes} />
           {showWorkspacesLink ? (
             <SidebarNavItem to="/workspaces" label="Workspaces" icon={GitBranch} />
-          ) : null}
-          {streamlined ? (
-            <>
-              <SidebarNavItem to="/projects" label="Projects" icon={FolderOpen} />
-              <SidebarStarredProjects />
-            </>
           ) : null}
           <PluginSlotOutlet
             slotTypes={["sidebar"]}

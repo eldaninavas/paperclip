@@ -35,11 +35,15 @@ export function CollectionToolbar({
   return (
     <div
       data-slot="collection-toolbar"
-      className={cn("flex flex-col gap-2", className)}
+      className={cn(
+        "flex flex-col gap-1.5 text-(length:--text-compact)",
+        "[&_input]:h-7 [&_button]:h-7 [&_button]:text-(length:--text-compact) [&_svg]:size-3.5",
+        className,
+      )}
       role="toolbar"
       aria-label={ariaLabel}
     >
-      <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
+      <div className="flex min-w-0 flex-col gap-1.5 sm:flex-row sm:items-center">
         {context ? (
           <div data-slot="collection-toolbar-context" className="min-w-0 shrink-0">
             {context}

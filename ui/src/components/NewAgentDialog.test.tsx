@@ -153,6 +153,9 @@ describe("NewAgentDialog", () => {
     await flushReact();
 
     expect(container.textContent).toContain("Add a new agent");
+    expect(container.textContent).toContain("Agent identity");
+    expect(container.textContent).toContain("How should this agent join?");
+    expect(container.querySelector('button[aria-label="hexagon shape"]')).toBeFalsy();
     expect(container.textContent).toContain("Invite an external agent");
 
     const inviteButton = Array.from(container.querySelectorAll("button")).find(
@@ -183,7 +186,7 @@ describe("NewAgentDialog", () => {
     });
     expect(getInviteOnboardingMock).toHaveBeenCalledWith("agent-token");
     expect(clipboardWriteTextMock).toHaveBeenCalledWith(
-      expect.stringContaining("You're invited to join a Paperclip company as an agent."),
+      expect.stringContaining("You're invited to join a Foundation company as an agent."),
     );
     expect(container.textContent).toContain("Agent onboarding prompt");
     expect(container.textContent).toContain("Send this prompt to the external agent");
@@ -210,6 +213,49 @@ describe("NewAgentDialog", () => {
     await act(async () => {
       root.unmount();
     });
+  });
+
+  it("carries the chosen identity into manual agent creation", async () => {
+    listAdaptersMock.mockResolvedValue([{ type: "claude_local", disabled: false }]);
+    const root = createRoot(container);
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+    await act(async () => {
+      root.render(
+        <QueryClientProvider client={queryClient}>
+          <NewAgentDialog />
+        </QueryClientProvider>,
+      );
+    });
+    await flushReact();
+
+    const customizeButton = container.querySelector<HTMLButtonElement>('button[aria-label="Customize agent identity"]');
+    await act(async () => customizeButton?.click());
+
+    expect(container.textContent).toContain("Choose an identity");
+    expect(container.textContent).not.toContain("How should this agent join?");
+
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>('button[aria-label="triangle shape"]')?.click();
+    });
+    const useIdentityButton = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent?.includes("Use this identity"),
+    );
+    await act(async () => useIdentityButton?.click());
+    const configureButton = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent?.includes("Configure a runtime manually"),
+    );
+    await act(async () => configureButton?.click());
+    await flushReact();
+
+    const claudeButton = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent?.includes("Claude Code"),
+    );
+    await act(async () => claudeButton?.click());
+
+    expect(navigateMock).toHaveBeenCalledWith("/agents/new?adapterType=claude_local&icon=agent%3Av1%3Atriangle%3Amint%3Abright%3Anone");
+
+    await act(async () => root.unmount());
   });
 
   it("hides Paperclip Runner configuration until the server enables it", async () => {
@@ -240,7 +286,7 @@ describe("NewAgentDialog", () => {
     await flushReact();
 
     expect(container.textContent).toContain("Claude Code");
-    expect(container.textContent).not.toContain("Paperclip Runner");
+    expect(container.textContent).not.toContain("Foundation Runner");
 
     await act(async () => {
       root.unmount();
@@ -274,7 +320,7 @@ describe("NewAgentDialog", () => {
     });
     await flushReact();
 
-    expect(container.textContent).toContain("Paperclip Runner");
+    expect(container.textContent).toContain("Foundation Runner");
 
     await act(async () => {
       root.unmount();

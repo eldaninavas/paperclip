@@ -84,7 +84,7 @@ export const PROJECT_ICONS: Record<ProjectIconName, LucideIcon> = {
   hexagon: Hexagon,
 };
 
-const DEFAULT_ICON: ProjectIconName = "folder";
+const DEFAULT_ICON: ProjectIconName = "box";
 
 export function getProjectIcon(iconName: string | null | undefined): LucideIcon {
   if (iconName && PROJECT_ICON_NAMES.includes(iconName as ProjectIconName)) {

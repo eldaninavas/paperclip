@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { Link, useParams, useNavigate, useLocation, Navigate } from "@/lib/router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { PROJECT_COLORS, PROJECT_ICON_NAMES, isUuidLike, type BudgetPolicySummary } from "@paperclipai/shared";
+import { isUuidLike, type BudgetPolicySummary } from "@paperclipai/shared";
 import { budgetsApi } from "../api/budgets";
 import { executionWorkspacesApi } from "../api/execution-workspaces";
 import { instanceSettingsApi } from "../api/instanceSettings";
@@ -19,6 +19,7 @@ import { ProjectProperties, type ProjectConfigFieldKey, type ProjectFieldSaveSta
 import { InlineEditor } from "../components/InlineEditor";
 import { StatusBadge } from "../components/StatusBadge";
 import { ProjectTile } from "../components/ProjectTile";
+import { ProjectTilePicker } from "../components/ProjectTilePicker";
 import { BudgetPolicyCard } from "../components/BudgetPolicyCard";
 import { IssuesList } from "../components/IssuesList";
 import { PageSkeleton } from "../components/PageSkeleton";
@@ -26,16 +27,14 @@ import { PageTabBar } from "../components/PageTabBar";
 import { ProjectWorkspacesContent } from "../components/ProjectWorkspacesContent";
 import { SummarySlotCard } from "../components/SummarySlotCard";
 import { MembershipAction } from "../components/MembershipAction";
+import { ProjectAssurancePanel } from "../components/assurance/ProjectAssurancePanel";
 import { StarToggle } from "../components/StarToggle";
 import { buildProjectWorkspaceSummaries } from "../lib/project-workspaces-tab";
 import { collectLiveIssueIds } from "../lib/liveIssueIds";
 import { projectRouteRef } from "../lib/utils";
-import { PROJECT_ICONS } from "../lib/project-icons";
 import { usePublishSharedQueryData, useSharedPollingQuery } from "../hooks/useSharedPolling";
+import { useStreamlinedUiEnabled } from "../hooks/useStreamlinedUiEnabled";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { cn } from "@/lib/utils";
 import { Tabs } from "@/components/ui/tabs";
 import { PluginLauncherOutlet } from "@/plugins/launchers";
 import { PluginSlotMount, PluginSlotOutlet, usePluginSlots } from "@/plugins/slots";
@@ -48,7 +47,7 @@ import {
 
 /* ── Top-level tab types ── */
 
-type ProjectBaseTab = "overview" | "list" | "plugin-operations" | "workspaces" | "configuration" | "budget";
+type ProjectBaseTab = "overview" | "list" | "plugin-operations" | "workspaces" | "configuration" | "budget" | "assurance";
 type ProjectPluginTab = `plugin:${string}`;
 type ProjectTab = ProjectBaseTab | ProjectPluginTab;
 
@@ -64,6 +63,7 @@ function resolveProjectTab(pathname: string, projectId: string): ProjectTab | nu
   if (tab === "overview") return "overview";
   if (tab === "configuration") return "configuration";
   if (tab === "budget") return "budget";
+  if (tab === "assurance") return "assurance";
   if (tab === "issues") return "list";
   if (tab === "plugin-operations") return "plugin-operations";
   if (tab === "workspaces") return "workspaces";
@@ -112,123 +112,11 @@ function OverviewContent({
   );
 }
 
-/* ── Combined icon + color picker popover (PAP-72 / PAP-68 part 4) ── */
-
-const DEFAULT_PROJECT_ICON = "folder";
-
-function ProjectTilePicker({
-  color,
-  icon,
-  onSelectIcon,
-  onSelectColor,
-}: {
-  color: string | null;
-  icon: string | null;
-  onSelectIcon: (icon: string) => void;
-  onSelectColor: (color: string | null) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const [search, setSearch] = useState("");
-
-  const filteredIcons = useMemo(() => {
-    const entries = PROJECT_ICON_NAMES.map((name) => [name, PROJECT_ICONS[name]] as const);
-    if (!search) return entries;
-    const q = search.toLowerCase();
-    return entries.filter(([name]) => name.includes(q));
-  }, [search]);
-
-  // Keep the popover open across selections so the user can pick both an icon
-  // and a color in one pass; reset the search when it closes.
-  return (
-    <Popover
-      open={open}
-      onOpenChange={(next) => {
-        setOpen(next);
-        if (!next) setSearch("");
-      }}
-    >
-      <PopoverTrigger asChild>
-        <button
-          type="button"
-          className="shrink-0 rounded-lg cursor-pointer hover:ring-2 hover:ring-foreground/20 transition-(--tp-box-shadow)"
-          aria-label="Change project icon and color"
-        >
-          <ProjectTile color={color} icon={icon} size="md" />
-        </button>
-      </PopoverTrigger>
-      <PopoverContent className="w-72 p-3" align="start">
-        {/* Icon search + grid */}
-        <p className="text-xs font-medium text-muted-foreground mb-2">Icon</p>
-        <Input
-          placeholder="Search icons..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="mb-2 h-8 text-sm"
-          autoFocus
-        />
-        <div className="grid grid-cols-7 gap-1 max-h-40 overflow-y-auto">
-          {filteredIcons.map(([name, Icon]) => (
-            <button
-              key={name}
-              type="button"
-              onClick={() => onSelectIcon(name)}
-              className={cn(
-                "flex items-center justify-center h-8 w-8 rounded hover:bg-accent transition-colors",
-                (icon ?? DEFAULT_PROJECT_ICON) === name && "bg-accent ring-1 ring-primary",
-              )}
-              title={name}
-            >
-              <Icon className="h-4 w-4" />
-            </button>
-          ))}
-          {filteredIcons.length === 0 && (
-            <p className="col-span-7 text-xs text-muted-foreground text-center py-2">No icons match</p>
-          )}
-        </div>
-
-        {/* Color swatches */}
-        <div className="mt-3 border-t border-border pt-3">
-          <p className="text-xs font-medium text-muted-foreground mb-2">Color</p>
-          <div className="grid grid-cols-5 gap-1.5">
-            {/* Neutral / reset-to-gray option */}
-            <button
-              type="button"
-              onClick={() => onSelectColor(null)}
-              className={`h-6 w-6 cursor-pointer transition-(--tp-transform-box-shadow) duration-150 hover:scale-110 ${
-                color === null
-                  ? "ring-2 ring-foreground ring-offset-1 ring-offset-background rounded-md"
-                  : ""
-              }`}
-              aria-label="Reset to neutral gray"
-              title="Neutral (default)"
-            >
-              <ProjectTile color={null} size="sm" />
-            </button>
-            {PROJECT_COLORS.map((swatch) => (
-              <button
-                key={swatch}
-                type="button"
-                onClick={() => onSelectColor(swatch)}
-                className={`h-6 w-6 rounded-md cursor-pointer transition-(--tp-transform-box-shadow) duration-150 hover:scale-110 ${
-                  swatch === color
-                    ? "ring-2 ring-foreground ring-offset-1 ring-offset-background"
-                    : "hover:ring-2 hover:ring-foreground/30"
-                }`}
-                style={{ backgroundColor: swatch }}
-                aria-label={`Select color ${swatch}`}
-              />
-            ))}
-          </div>
-        </div>
-      </PopoverContent>
-    </Popover>
-  );
-}
-
 /* ── List (issues) tab content ── */
 
 function ProjectIssuesList({ projectId, companyId }: { projectId: string; companyId: string }) {
   const queryClient = useQueryClient();
+  const { enabled: streamlinedUiEnabled } = useStreamlinedUiEnabled();
 
   const { data: agents } = useQuery({
     queryKey: queryKeys.agents.list(companyId),
@@ -285,6 +173,8 @@ function ProjectIssuesList({ projectId, companyId }: { projectId: string; compan
       liveIssueIds={liveIssueIds}
       projectId={projectId}
       viewStateKey="paperclip:project-issues-view"
+      rowPresentation={streamlinedUiEnabled ? "task" : "legacy"}
+      toolbarPresentation={streamlinedUiEnabled ? "collection" : "legacy"}
       onUpdateIssue={(id, data) => updateIssue.mutate({ id, data })}
     />
   );
@@ -553,6 +443,10 @@ export function ProjectDetail() {
       navigate(`/projects/${canonicalProjectRef}/budget`, { replace: true });
       return;
     }
+    if (activeTab === "assurance") {
+      navigate(`/projects/${canonicalProjectRef}/assurance`, { replace: true });
+      return;
+    }
     if (activeTab === "plugin-operations") {
       navigate(`/projects/${canonicalProjectRef}/plugin-operations`, { replace: true });
       return;
@@ -746,6 +640,8 @@ export function ProjectDetail() {
       navigate(`/projects/${canonicalProjectRef}/workspaces`);
     } else if (tab === "budget") {
       navigate(`/projects/${canonicalProjectRef}/budget`);
+    } else if (tab === "assurance") {
+      navigate(`/projects/${canonicalProjectRef}/assurance`);
     } else if (tab === "plugin-operations") {
       navigate(`/projects/${canonicalProjectRef}/plugin-operations`);
     } else if (tab === "configuration") {
@@ -884,6 +780,7 @@ export function ProjectDetail() {
             ...(showWorkspacesTab ? [{ value: "workspaces", label: "Workspaces" }] : []),
             { value: "configuration", label: "Configuration" },
             { value: "budget", label: "Budget" },
+            { value: "assurance", label: "Assurance" },
             ...pluginTabItems.map((item) => ({
               value: item.value,
               label: item.label,
@@ -957,6 +854,10 @@ export function ProjectDetail() {
             onSave={(amount) => budgetMutation.mutate(amount)}
           />
         </div>
+      ) : null}
+
+      {activeTab === "assurance" && project?.id ? (
+        <ProjectAssurancePanel projectId={project.id} projectName={project.name} />
       ) : null}
 
       {activePluginTab && (

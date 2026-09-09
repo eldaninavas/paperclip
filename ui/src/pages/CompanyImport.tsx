@@ -1030,7 +1030,7 @@ export function CompanyImport() {
   }, [installedAdapters]);
   // Native runner is the one adapter that fails closed in the importer. Other
   // adapter choices preserve the importer's existing fail-open behavior when
-  // availability cannot be read, but Paperclip Runner only appears after the
+  // availability cannot be read, but Foundation Runner only appears after the
   // server explicitly reports that its experimental flag is enabled.
   const nativeRunnerAvailable =
     availableAdapterTypes?.has("paperclip_runner") === true;
@@ -1042,7 +1042,7 @@ export function CompanyImport() {
   );
 
   const localZipHelpText =
-    "Upload a .zip exported directly from Paperclip. Re-zipped archives created by Finder, Explorer, or other zip tools may not import correctly.";
+    "Upload a .zip exported directly from Foundation. Re-zipped archives created by Finder, Explorer, or other zip tools may not import correctly.";
 
   useEffect(() => {
     setBreadcrumbs([
@@ -1847,7 +1847,7 @@ export function CompanyImport() {
         <div>
           <h2 className="text-base font-semibold">Import source</h2>
           <p className="text-xs text-muted-foreground mt-1">
-            Choose a GitHub repo or upload a local Paperclip zip package.
+            Choose a GitHub repo or upload a local Foundation zip package.
           </p>
         </div>
 

@@ -1,14 +1,13 @@
 import {
   Inbox,
   ListChecks,
-  CircleCheck,
+  CircleDot,
   Target,
   LayoutDashboard,
   DollarSign,
   History,
   Search,
   SquarePen,
-  Network,
   Boxes,
   Repeat,
   Layers,
@@ -18,17 +17,16 @@ import {
   FolderOpen,
   Unplug,
   MessagesSquare,
-  GanttChartSquare,
   LayoutGrid,
   Users,
+  Box,
+  Bot,
+  ShieldCheck,
 } from "lucide-react";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { SidebarSection } from "./SidebarSection";
 import { SidebarNavItem } from "./SidebarNavItem";
-import { SidebarAgents } from "./SidebarAgents";
-import { SidebarProjects } from "./SidebarProjects";
-import { SidebarStarredProjects } from "./SidebarStarredProjects";
 import { SidebarRecentTasks } from "./SidebarRecentTasks";
 import { useDialogActions } from "../context/DialogContext";
 import { useCompany } from "../context/CompanyContext";
@@ -39,7 +37,6 @@ import { instanceSettingsApi } from "../api/instanceSettings";
 import { queryKeys } from "../lib/queryKeys";
 import { attentionBadgeCount } from "../lib/attention";
 import { useInboxBadge } from "../hooks/useInboxBadge";
-import { useStreamlinedUiEnabled } from "../hooks/useStreamlinedUiEnabled";
 import { usePublishSharedQueryData, useSharedPollingQuery } from "../hooks/useSharedPolling";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn, SIDEBAR_RAIL_HIDDEN_LABEL } from "../lib/utils";
@@ -47,22 +44,40 @@ import { PluginSlotOutlet } from "@/plugins/slots";
 import { PluginLauncherOutlet } from "@/plugins/launchers";
 import { SidebarCompanyMenu } from "./SidebarCompanyMenu";
 import { primarySidebarStyles } from "./primary-sidebar-styles";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
+/**
+ * Foundation navigation contract (supersedes the upstream Foundation nav).
+ *
+ * The primary group is capped at five rows and mirrors the product model:
+ * review is a task state, not a separate destination. Everything
+ * else upstream surfaced at the top level — the dashboard, spend, activity,
+ * skills, connections, company settings, and every experimental surface —
+ * still exists and stays routable, but it lives in the collapsed "Más"
+ * section so the default chrome does not read as an ops cockpit.
+ *
+ * Capabilities are hidden here, never removed: no route is deleted by this
+ * component.
+ */
 export function Sidebar() {
-  const { openNewIssue } = useDialogActions();
-  // Every labeled section is collapsible (session-scoped, default open) —
-  // one policy across static nav groups and the data-driven sections.
-  const [workOpen, setWorkOpen] = useState(true);
-  const [organizationOpen, setOrganizationOpen] = useState(true);
+  const { openNewIssue, openNewProject, openNewAgent } = useDialogActions();
+  // Secondary nav is collapsed by default — that default is the whole point of
+  // the section, so it is not merely a remembered preference.
+  const [moreOpen, setMoreOpen] = useState(false);
   const { selectedCompanyId, selectedCompany } = useCompany();
   const { collapsed, peeking } = useSidebar();
-  const { enabled: streamlinedUiEnabled } = useStreamlinedUiEnabled();
   const rail = collapsed && !peeking;
   const inboxBadge = useInboxBadge(selectedCompanyId);
   const { data: experimentalSettings } = useQuery({
     queryKey: queryKeys.instance.experimentalSettings,
     queryFn: () => instanceSettingsApi.getExperimental(),
   });
+
   const liveRunsQueryKey = queryKeys.liveRuns(selectedCompanyId!);
   const sharedLiveRuns = useSharedPollingQuery({
     companyId: selectedCompanyId,
@@ -82,14 +97,13 @@ export function Sidebar() {
     refetchInterval: sharedLiveRuns.refetchInterval,
   });
   usePublishSharedQueryData(sharedLiveRuns, liveRuns, liveRunsUpdatedAt);
-  const liveRunCount = liveRuns?.length ?? 0;
   const liveIssueIds = new Set(
     (liveRuns ?? []).flatMap((run) => run.issueId ? [run.issueId] : []),
   );
+
   const showWorkspacesLink = experimentalSettings?.enableIsolatedWorkspaces === true;
   const showPipelines = experimentalSettings?.enablePipelines === true;
   const showStatusCards = experimentalSettings?.enableStatusCards === true;
-  const goalsLinkPending = experimentalSettings === undefined;
   const showGoalsLink = experimentalSettings?.enableGoalsSidebarLink === true;
   // Decisions (attention home) is an experimental surface (PAP-13481): the nav
   // item is hidden entirely until the flag is enabled (same no-flash pattern as
@@ -113,66 +127,99 @@ export function Sidebar() {
     companyPrefix: selectedCompany?.issuePrefix ?? null,
   };
 
+  const defineWorkButton = (
+    <button
+      onClick={() => openNewIssue()}
+      data-slot="icon-button"
+      aria-label={rail ? "Definir trabajo" : undefined}
+      className={cn(
+        "flex min-h-(--foundation-nav-height) items-center gap-2 rounded-(--foundation-control-radius) px-2.5 py-0.5 pointer-coarse:min-h-11 text-xs font-normal text-foreground/72 transition-[background-color,color,opacity] duration-(--motion-duration-exit) ease-(--motion-ease-out) hover:bg-(--foundation-sidebar-hover) hover:text-foreground",
+      )}
+    >
+      <SquarePen className="size-3.5 shrink-0" strokeWidth={1.7} />
+      <span className={rail ? SIDEBAR_RAIL_HIDDEN_LABEL : "truncate"}>Definir trabajo</span>
+    </button>
+  );
+
   return (
     <aside
       className={cn(
         "w-full h-full min-h-0 flex flex-col",
-        streamlinedUiEnabled
-          ? primarySidebarStyles.surface
-          : "border-r border-border bg-background",
+        primarySidebarStyles.surface,
       )}
     >
-      {/* Top bar: company name, aligned with top sections and borderless.
-          Search deliberately does NOT live here:
-          the header's spare width goes to the workspace/organization name,
-          which is the user's orientation anchor and truncates otherwise.
-          Search is the first nav item below instead. */}
-      <div className="flex h-(--sz-60px) shrink-0 items-center gap-1 px-3">
+      <div className="flex h-11 shrink-0 items-center gap-1 border-b border-border/60 px-2">
         <SidebarCompanyMenu />
+        {!rail ? (
+          <div className="flex shrink-0 items-center gap-0.5">
+            <SidebarNavItem
+              to="/search"
+              label="Buscar"
+              icon={Search}
+              className="size-7 min-h-7 justify-center gap-0 px-0 py-0"
+              labelClassName="sr-only"
+            />
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  aria-label="Crear"
+                  className="flex size-7 items-center justify-center rounded-full bg-(--foundation-sidebar-selected) text-foreground/80 transition-[background-color,color,transform] duration-(--motion-duration-exit) ease-(--motion-ease-out) hover:scale-[1.03] hover:bg-foreground/15 hover:text-foreground active:scale-[0.97]"
+                >
+                  <SquarePen className="size-3.5" strokeWidth={1.7} />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent side="right" align="start" className="w-52">
+                <DropdownMenuItem onSelect={openNewProject}>
+                  <Box /> Proyecto
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => openNewIssue()}>
+                  <CircleDot /> Tarea
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={openNewAgent}>
+                  <Bot /> Agente de IA
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        ) : null}
       </div>
 
       <nav className={primarySidebarStyles.nav}>
-        <div className={primarySidebarStyles.group}>
-          {/* New Task button aligned with nav items */}
-          {(() => {
-            const newTaskButton = (
-              <button
-                onClick={() => openNewIssue()}
-                data-slot="icon-button"
-                aria-label={rail ? "New Task" : undefined}
-                className={cn(
-                  "flex items-center gap-2.5 mx-2 rounded-lg px-2 py-1.5 pointer-coarse:py-1 text-(length:--text-compact) font-medium text-foreground/80 hover:text-foreground transition-colors",
-                  streamlinedUiEnabled ? "hover:bg-background" : "hover:bg-accent/50",
-                )}
-              >
-                <SquarePen className="h-4 w-4 shrink-0" />
-                <span className={rail ? SIDEBAR_RAIL_HIDDEN_LABEL : "truncate"}>New Task</span>
-              </button>
-            );
-            return rail ? (
-              <Tooltip>
-                <TooltipTrigger asChild>{newTaskButton}</TooltipTrigger>
-                <TooltipContent side="right">New Task</TooltipContent>
-              </Tooltip>
-            ) : (
-              newTaskButton
-            );
-          })()}
-          {/* Search moved out of the header so the workspace name keeps the
-              width; a nav row also keeps search reachable from the
-              collapsed rail, where the old header icon was dropped entirely.
-              Cmd/Ctrl+K remains the keyboard path (command palette). */}
-          <SidebarNavItem to="/search" label="Search" icon={Search} />
-          <SidebarNavItem to="/dashboard" label="Dashboard" icon={LayoutDashboard} liveCount={liveRunCount} />
+        <div data-testid="foundation-primary-nav" className={primarySidebarStyles.group}>
           <SidebarNavItem
             to="/inbox"
             label="Inbox"
             icon={Inbox}
             badge={inboxBadge.inbox}
-            badgeLabel="unread"
+            badgeLabel="sin leer"
             badgeTone={inboxBadge.failedRuns > 0 ? "danger" : "default"}
             alert={inboxBadge.failedRuns > 0}
           />
+          <SidebarNavItem to="/projects" label="Proyectos" icon={Box} />
+          <SidebarNavItem to="/issues" label="Tareas" icon={CircleDot} />
+          <SidebarNavItem to="/agents" label="Agentes" icon={Bot} />
+          <SidebarNavItem to="/assurance" label="Assurance" icon={ShieldCheck} />
+        </div>
+
+        <SidebarSection label="Más" collapsible={{ open: moreOpen, onOpenChange: setMoreOpen }}>
+          <SidebarNavItem to="/company/settings/members" label="Miembros" icon={Users} />
+          {rail ? (
+            <Tooltip>
+              <TooltipTrigger asChild>{defineWorkButton}</TooltipTrigger>
+              <TooltipContent side="right">Definir trabajo</TooltipContent>
+            </Tooltip>
+          ) : (
+            defineWorkButton
+          )}
+          <SidebarNavItem to="/artifacts" label="Entregables" icon={Package} />
+          <SidebarNavItem to="/routines" label="Rutinas" icon={Repeat} />
+          <SidebarNavItem to="/skills" label="Habilidades" icon={Boxes} />
+          <SidebarNavItem to="/apps" label="Conexiones" icon={Unplug} />
+          <SidebarNavItem to="/activity" label="Actividad" icon={History} />
+          <SidebarNavItem to="/costs" label="Costos" icon={DollarSign} />
+          <SidebarNavItem to="/dashboard" label="Panel" icon={LayoutDashboard} />
+          <SidebarNavItem to="/company/settings" label="Empresa" icon={Settings} />
           {showDecisions ? (
             <SidebarNavItem
               to="/decisions"
@@ -188,18 +235,6 @@ export function Sidebar() {
           {conferenceRoomChatEnabled ? (
             <SidebarNavItem to="/board-chat" label="Conference Room" icon={MessagesSquare} />
           ) : null}
-        </div>
-
-        <SidebarSection label="Work" collapsible={{ open: workOpen, onOpenChange: setWorkOpen }}>
-          <SidebarNavItem to="/issues" label="Tasks" icon={CircleCheck} />
-          {streamlinedUiEnabled ? (
-            <>
-              <SidebarNavItem to="/projects" label="Projects" icon={FolderOpen} />
-              <SidebarStarredProjects />
-            </>
-          ) : null}
-          <SidebarNavItem to="/routines" label="Routines" icon={Repeat} />
-          <SidebarNavItem to="/artifacts" label="Artifacts" icon={Package} />
           {showCases ? (
             <SidebarNavItem to="/cases" label="Cases" icon={Layers} textBadge="beta" />
           ) : null}
@@ -208,12 +243,6 @@ export function Sidebar() {
           ) : null}
           {showGoalsLink ? (
             <SidebarNavItem to="/goals" label="Goals" icon={Target} />
-          ) : goalsLinkPending ? (
-            <div
-              data-testid="sidebar-goals-placeholder"
-              className="h-8 pointer-coarse:h-7"
-              aria-hidden="true"
-            />
           ) : null}
           {showWorkspacesLink ? (
             <SidebarNavItem to="/workspaces" label="Workspaces" icon={GitBranch} />
@@ -233,37 +262,7 @@ export function Sidebar() {
           />
         </SidebarSection>
 
-        {streamlinedUiEnabled ? (
-          <SidebarSection
-            label="Org"
-            collapsible={{ open: organizationOpen, onOpenChange: setOrganizationOpen }}
-          >
-            <SidebarNavItem to="/agents" label="Agents" icon={Users} />
-            <SidebarNavItem to="/skills" label="Skills" icon={Boxes} />
-            <SidebarNavItem to="/apps" label="Connectors" icon={Unplug} />
-            <SidebarNavItem to="/activity" label="Audit" icon={History} />
-          </SidebarSection>
-        ) : null}
-
-        {streamlinedUiEnabled ? (
-          <SidebarRecentTasks companyId={selectedCompanyId} liveIssueIds={liveIssueIds} />
-        ) : (
-          <>
-            <SidebarProjects />
-            <SidebarAgents />
-            <SidebarSection
-              label="Organization"
-              collapsible={{ open: organizationOpen, onOpenChange: setOrganizationOpen }}
-            >
-              <SidebarNavItem to="/org" label="Org" icon={Network} />
-              <SidebarNavItem to="/apps" label="Connectors" icon={Unplug} />
-              <SidebarNavItem to="/timeline" label="Timeline" icon={GanttChartSquare} />
-              <SidebarNavItem to="/costs" label="Costs" icon={DollarSign} />
-              <SidebarNavItem to="/activity" label="Activity" icon={History} />
-              <SidebarNavItem to="/company/settings" label="Settings" icon={Settings} />
-            </SidebarSection>
-          </>
-        )}
+        <SidebarRecentTasks companyId={selectedCompanyId} liveIssueIds={liveIssueIds} />
 
         <PluginSlotOutlet
           slotTypes={["sidebarPanel"]}

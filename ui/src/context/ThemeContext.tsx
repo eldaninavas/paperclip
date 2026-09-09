@@ -16,9 +16,9 @@ interface ThemeContextValue {
   toggleTheme: () => void;
 }
 
-const THEME_STORAGE_KEY = "paperclip.theme";
-const DARK_THEME_COLOR = "#18181b";
-const LIGHT_THEME_COLOR = "#ffffff";
+const THEME_STORAGE_KEY = "foundation.theme";
+const DARK_THEME_COLOR = "#111214";
+const LIGHT_THEME_COLOR = "#f4f4f5";
 const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 
 function resolveThemeFromDocument(): Theme {

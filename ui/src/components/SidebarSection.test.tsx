@@ -104,7 +104,10 @@ describe("SidebarSection", () => {
     expect(workLabel?.parentElement?.textContent).toBe("Work");
     expect(projectsLabel?.parentElement?.textContent).toBe("Projects");
     expect(projectsLabel?.parentElement?.querySelector("svg")).toBeNull();
-    expect(container.querySelector('button[aria-label="Collapse Projects"] svg')).toBeTruthy();
+    const caretButton = container.querySelector('button[aria-label="Collapse Projects"]');
+    expect(caretButton?.querySelector("svg")).toBeTruthy();
+    expect(caretButton?.classList).toContain("ml-auto");
+    expect(caretButton?.querySelector("svg")?.classList).not.toContain("opacity-0");
   });
 
   it("keeps collapse on the caret and opens the menu from the heading", async () => {
@@ -183,7 +186,8 @@ describe("SidebarSection", () => {
       .find((element) => element.textContent === "Settings");
 
     expect(settingsLabel).toBeTruthy();
-    expect(settingsLabel?.getAttribute("class")).toContain("uppercase");
+    expect(settingsLabel?.getAttribute("class")).toContain("text-(length:--text-micro)");
+    expect(settingsLabel?.getAttribute("class")).not.toContain("uppercase");
     expect(container.querySelector(".bg-border\\/60")).toBeNull();
   });
 

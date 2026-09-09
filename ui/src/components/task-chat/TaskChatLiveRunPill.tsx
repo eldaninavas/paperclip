@@ -5,6 +5,7 @@ import { useSecondTick } from "@/hooks/useSecondTick";
 import { formatDurationWords } from "@/lib/issue-chat-messages";
 import { isCommandTool } from "@/lib/transcriptPresentation";
 import { isTerminalRunStatus } from "@/components/task-chat/transcript-adapter";
+import { AgentIcon } from "@/components/AgentIconPicker";
 
 /**
  * "ran N commands, called M tools" for the live tail's status pill, counted off
@@ -47,6 +48,7 @@ export function TaskChatLiveRunPill({
   startedAtMs,
   finishedAtMs,
   toolSummary,
+  agentIcon,
 }: {
   status: string;
   /** Run start (startedAt, falling back to createdAt) in ms, or null if unknown. */
@@ -54,6 +56,7 @@ export function TaskChatLiveRunPill({
   /** Run finish in ms once terminal; drives the settled elapsed readout. */
   finishedAtMs?: number | null;
   toolSummary: string | null;
+  agentIcon?: string | null;
 }) {
   const active = !isTerminalRunStatus(status);
   // One shared page-wide ticker drives the live elapsed readout, matching the
@@ -75,7 +78,11 @@ export function TaskChatLiveRunPill({
     >
       <span className="inline-flex items-center gap-2 text-sm font-medium text-foreground/80">
         {active ? (
-          <Loader2 className="h-4 w-4 shrink-0 animate-spin text-muted-foreground" />
+          agentIcon ? (
+            <AgentIcon icon={agentIcon} status="running" className="size-6 shrink-0" />
+          ) : (
+            <Loader2 className="h-4 w-4 shrink-0 animate-spin text-muted-foreground" />
+          )
         ) : (
           <span className="flex h-4 w-4 shrink-0 items-center justify-center">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-500/70" />

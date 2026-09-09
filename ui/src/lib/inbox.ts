@@ -20,6 +20,7 @@ export const FAILED_RUN_STATUSES = new Set(["failed", "timed_out"]);
 export const ACTIONABLE_APPROVAL_STATUSES = new Set(["pending", "revision_requested"]);
 export const DISMISSED_KEY = "paperclip:inbox:dismissed";
 export const READ_ITEMS_KEY = "paperclip:inbox:read-items";
+export const READ_ITEMS_CHANGED_EVENT = "paperclip:inbox:read-items-changed";
 export const INBOX_LAST_TAB_KEY = "paperclip:inbox:last-tab";
 export const INBOX_ISSUE_COLUMNS_KEY = "paperclip:inbox:issue-columns";
 export const INBOX_NESTING_KEY = "paperclip:inbox:nesting";
@@ -100,6 +101,11 @@ export interface InboxGroupedSection {
   displayItems: InboxWorkItem[];
   childrenByIssueId: Map<string, Issue[]>;
   searchSection: InboxSearchSection;
+}
+
+export interface InboxTaskActivityGrouping {
+  sections: InboxGroupedSection[];
+  activityItemsByIssueId: Map<string, InboxWorkItem[]>;
 }
 
 export interface InboxKeyboardGroupSection {
@@ -355,6 +361,9 @@ export function loadReadInboxItems(): Set<string> {
 export function saveReadInboxItems(ids: Set<string>) {
   try {
     localStorage.setItem(READ_ITEMS_KEY, JSON.stringify([...ids]));
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent(READ_ITEMS_CHANGED_EVENT));
+    }
   } catch {
     // Ignore localStorage failures.
   }
@@ -1188,6 +1197,172 @@ export function getInboxWorkItemKey(item: InboxWorkItem): string {
   return `join:${item.joinRequest.id}`;
 }
 
+export function shouldSurfaceInboxApprovalForIssueState(
+  approval: Approval,
+  issueById: ReadonlyMap<string, Issue>,
+): boolean {
+  if (approval.type !== "assurance_task_validation") return true;
+  const payload = approval.payload as Record<string, unknown> | null;
+  const issueId = typeof payload?.issueId === "string"
+    ? payload.issueId
+    : typeof payload?.taskId === "string"
+      ? payload.taskId
+      : null;
+  if (!issueId) return true;
+  const issue = issueById.get(issueId);
+  return !issue || issue.status === "done";
+}
+
+export function filterInboxApprovalsForDelivery(
+  approvalRows: Approval[],
+  issueById: ReadonlyMap<string, Issue>,
+): Approval[] {
+  const latestAssuranceApprovalByIssueId = new Map<string, Approval>();
+  const issueIdForApproval = (approval: Approval) => {
+    const payload = approval.payload as Record<string, unknown> | null;
+    return typeof payload?.issueId === "string"
+      ? payload.issueId
+      : typeof payload?.taskId === "string"
+        ? payload.taskId
+        : null;
+  };
+
+  for (const approval of approvalRows) {
+    if (
+      approval.type !== "assurance_task_validation"
+      || !shouldSurfaceInboxApprovalForIssueState(approval, issueById)
+    ) continue;
+    const issueId = issueIdForApproval(approval);
+    if (!issueId) continue;
+    const current = latestAssuranceApprovalByIssueId.get(issueId);
+    if (
+      !current
+      || normalizeTimestamp(approval.updatedAt) > normalizeTimestamp(current.updatedAt)
+    ) {
+      latestAssuranceApprovalByIssueId.set(issueId, approval);
+    }
+  }
+
+  return approvalRows.filter((approval) => {
+    if (approval.type !== "assurance_task_validation") return true;
+    if (!shouldSurfaceInboxApprovalForIssueState(approval, issueById)) return false;
+    const issueId = issueIdForApproval(approval);
+    return !issueId || latestAssuranceApprovalByIssueId.get(issueId)?.id === approval.id;
+  });
+}
+
+/**
+ * Collapses the noisy event stream (approvals and failed runs) into its task row.
+ * The task remains in the section's normal position while its activity is rendered
+ * on demand by the inbox. Items that cannot be tied to a loaded task stay visible.
+ */
+export function groupInboxActivityByIssue(
+  sections: ReadonlyArray<InboxGroupedSection>,
+  issueById: ReadonlyMap<string, Issue>,
+): InboxTaskActivityGrouping {
+  const activityItemsByIssueId = new Map<string, InboxWorkItem[]>();
+
+  const issueIdForItem = (item: InboxWorkItem): string | null => {
+    if (item.kind === "issue") return item.issue.id;
+    if (item.kind === "approval") {
+      const payload = item.approval.payload as Record<string, unknown> | null;
+      return typeof payload?.issueId === "string"
+        ? payload.issueId
+        : typeof payload?.taskId === "string"
+          ? payload.taskId
+          : null;
+    }
+    if (item.kind === "failed_run") {
+      const context = item.run.contextSnapshot;
+      if (!context) return null;
+      return typeof context.issueId === "string"
+        ? context.issueId
+        : typeof context.taskId === "string"
+          ? context.taskId
+          : null;
+    }
+    return null;
+  };
+
+  const groupedSections = sections.map((section) => {
+    if (section.searchSection !== "none") return section;
+
+    const visibleIssueIds = new Set<string>();
+    for (const item of section.displayItems) {
+      if (item.kind === "issue") visibleIssueIds.add(item.issue.id);
+    }
+    for (const [parentId, children] of section.childrenByIssueId) {
+      visibleIssueIds.add(parentId);
+      for (const child of children) visibleIssueIds.add(child.id);
+    }
+
+    const displayItems: InboxWorkItem[] = [];
+    const missingIssueIds: string[] = [];
+    for (const item of section.displayItems) {
+      if (item.kind === "issue" || item.kind === "join_request") {
+        displayItems.push(item);
+        continue;
+      }
+
+      const issueId = issueIdForItem(item);
+      const linkedIssue = issueId ? issueById.get(issueId) : null;
+      if (!issueId || !linkedIssue) {
+        displayItems.push(item);
+        continue;
+      }
+
+      const activity = activityItemsByIssueId.get(issueId) ?? [];
+      activity.push(item);
+      activityItemsByIssueId.set(issueId, activity);
+      if (!visibleIssueIds.has(issueId)) {
+        visibleIssueIds.add(issueId);
+        missingIssueIds.push(issueId);
+      }
+    }
+
+    for (const issueId of missingIssueIds) {
+      const issue = issueById.get(issueId);
+      const activity = activityItemsByIssueId.get(issueId);
+      if (!issue || !activity?.length) continue;
+      displayItems.push({
+        kind: "issue",
+        issue,
+        timestamp: Math.max(...activity.map((item) => item.timestamp)),
+      });
+    }
+
+    const timestampedDisplayItems = displayItems.map((item): InboxWorkItem => {
+      if (item.kind !== "issue") return item;
+      const activity = activityItemsByIssueId.get(item.issue.id);
+      if (!activity?.length) return item;
+      return {
+        ...item,
+        timestamp: Math.max(item.timestamp, ...activity.map((activityItem) => activityItem.timestamp)),
+      };
+    });
+
+    timestampedDisplayItems.sort((a, b) => {
+      const aActivity = a.kind === "issue" ? activityItemsByIssueId.get(a.issue.id) : null;
+      const bActivity = b.kind === "issue" ? activityItemsByIssueId.get(b.issue.id) : null;
+      const aTimestamp = aActivity?.length
+        ? Math.max(a.timestamp, ...aActivity.map((item) => item.timestamp))
+        : a.timestamp;
+      const bTimestamp = bActivity?.length
+        ? Math.max(b.timestamp, ...bActivity.map((item) => item.timestamp))
+        : b.timestamp;
+      return bTimestamp - aTimestamp;
+    });
+
+    return { ...section, displayItems: timestampedDisplayItems };
+  });
+
+  for (const activity of activityItemsByIssueId.values()) {
+    activity.sort((a, b) => b.timestamp - a.timestamp);
+  }
+
+  return { sections: groupedSections, activityItemsByIssueId };
+}
+
 export function buildInboxKeyboardNavEntries(
   groupedSections: ReadonlyArray<InboxKeyboardGroupSection>,
   collapsedGroupKeys: ReadonlySet<string>,
@@ -1270,6 +1445,7 @@ export function computeInboxBadgeData({
   dismissedAlerts,
   dismissedAtByKey,
   currentUserId,
+  readItems = new Set<string>(),
 }: {
   approvals: Approval[];
   joinRequests: JoinRequest[];
@@ -1279,18 +1455,25 @@ export function computeInboxBadgeData({
   dismissedAlerts: Set<string>;
   dismissedAtByKey: ReadonlyMap<string, number>;
   currentUserId?: string | null;
+  readItems?: ReadonlySet<string>;
 }): InboxBadgeData {
-  const actionableApprovals = approvals.filter(
+  const issueById = new Map(mineIssues.map((issue) => [issue.id, issue]));
+  const actionableApprovals = filterInboxApprovalsForDelivery(approvals, issueById).filter(
     (approval) =>
       isApprovalVisibleInMine(approval, currentUserId) &&
       ACTIONABLE_APPROVAL_STATUSES.has(approval.status) &&
+      !readItems.has(`approval:${approval.id}`) &&
       !isInboxEntityDismissed(dismissedAtByKey, `approval:${approval.id}`, approval.updatedAt),
   ).length;
   const failedRuns = getLatestFailedRunsByAgent(heartbeatRuns).filter(
-    (run) => !isInboxEntityDismissed(dismissedAtByKey, `run:${run.id}`, run.createdAt),
+    (run) =>
+      !readItems.has(`run:${run.id}`) &&
+      !isInboxEntityDismissed(dismissedAtByKey, `run:${run.id}`, run.createdAt),
   ).length;
   const visibleJoinRequests = joinRequests.filter(
-    (jr) => !isInboxEntityDismissed(dismissedAtByKey, `join:${jr.id}`, jr.updatedAt ?? jr.createdAt),
+    (jr) =>
+      !readItems.has(`join:${jr.id}`) &&
+      !isInboxEntityDismissed(dismissedAtByKey, `join:${jr.id}`, jr.updatedAt ?? jr.createdAt),
   ).length;
   const visibleMineIssues = mineIssues.filter((issue) => issue.isUnreadForMe).length;
   const agentErrorCount = dashboard?.agents.error ?? 0;

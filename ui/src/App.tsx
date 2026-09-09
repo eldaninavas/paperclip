@@ -48,6 +48,9 @@ import { Goals } from "./pages/Goals";
 import { Artifacts } from "./pages/Artifacts";
 import { GoalDetail } from "./pages/GoalDetail";
 import { Approvals } from "./pages/Approvals";
+import { Assurance } from "./pages/Assurance";
+import { AssuranceDossierDetail } from "./pages/AssuranceDossierDetail";
+import { AssuranceVerify } from "./pages/AssuranceVerify";
 import { ApprovalDetail } from "./pages/ApprovalDetail";
 import { CompanyActivity } from "./pages/audit/CompanyActivity";
 import { AuditHub } from "./pages/audit/AuditHub";
@@ -143,7 +146,9 @@ function ProductionSurface({ children }: { children: ReactNode }) {
 function boardRoutes(streamlinedUiEnabled: boolean) {
   return (
     <>
-      <Route index element={<Navigate to="dashboard" replace />} />
+      {/* Foundation home is the acceptance queue, not the ops dashboard.
+          The dashboard stays routable at /dashboard. */}
+      <Route index element={<Navigate to="approvals" replace />} />
       <Route path="dashboard" element={<Dashboard />} />
       <Route path="dashboard/live" element={<DashboardLive />} />
       <Route
@@ -281,6 +286,7 @@ function boardRoutes(streamlinedUiEnabled: boolean) {
       <Route path="projects/:projectId/workspaces" element={<ProjectDetail />} />
       <Route path="projects/:projectId/configuration" element={<ProjectDetail />} />
       <Route path="projects/:projectId/budget" element={<ProjectDetail />} />
+      <Route path="projects/:projectId/assurance" element={<ProjectDetail />} />
       <Route element={<IsolatedWorkspacesRouteGate />}>
         <Route path="workspaces" element={<Workspaces />} />
       </Route>
@@ -367,6 +373,8 @@ function boardRoutes(streamlinedUiEnabled: boolean) {
       <Route path="approvals/pending" element={<Approvals />} />
       <Route path="approvals/all" element={<Approvals />} />
       <Route path="approvals/:approvalId" element={<ApprovalDetail />} />
+      <Route path="assurance" element={<Assurance />} />
+      <Route path="assurance/dossiers/:dossierId" element={<AssuranceDossierDetail />} />
       <Route path="activity" element={streamlinedUiEnabled ? <CompanyActivity /> : <ProductionSurface><ProductionCompanyActivity /></ProductionSurface>} />
       {streamlinedUiEnabled ? (
         <>
@@ -575,7 +583,7 @@ export function OnboardingRoutePage() {
             <p className="text-sm text-muted-foreground">
               {t("app.cloudCreateUnavailable", {
                 defaultValue:
-                  "Organizations are created in Paperclip Cloud. This instance can't reach it right now — try again from your Cloud portfolio.",
+                  "Organizations are created in Foundation Cloud. This instance can't reach it right now — try again from your Cloud portfolio.",
               })}
             </p>
           ) : (
@@ -627,7 +635,8 @@ function CompanyRootRedirect() {
     return <NoCompaniesStartPage />;
   }
 
-  return <Navigate to={`/${targetCompany.issuePrefix}/dashboard`} replace />;
+  // Foundation home is the acceptance queue, not the ops dashboard.
+  return <Navigate to={`/${targetCompany.issuePrefix}/approvals`} replace />;
 }
 
 function StatusCardsLegacyRedirect() {
@@ -704,7 +713,7 @@ function NoCompaniesStartPage() {
             <p className="text-sm text-muted-foreground">
               {t("app.cloudCreateUnavailable", {
                 defaultValue:
-                  "Organizations are created in Paperclip Cloud. This instance can't reach it right now — try again from your Cloud portfolio.",
+                  "Organizations are created in Foundation Cloud. This instance can't reach it right now — try again from your Cloud portfolio.",
               })}
             </p>
           ) : (
@@ -735,6 +744,7 @@ export function App() {
         <Route path="board-claim/:token" element={<BoardClaimPage />} />
         <Route path="cli-auth/:id" element={<CliAuthPage />} />
         <Route path="invite/:token" element={<InviteLandingPage />} />
+        <Route path="verify/:publicId" element={<AssuranceVerify />} />
         <Route path="tests/perf/long-thread" element={<IssueChatLongThreadPerf />} />
         <Route path="ux-lab/bootstrap-setup" element={<BootstrapSetupUxLab />} />
         <Route path="ux-lab/responsible-user-denial" element={<ResponsibleUserDenialUxLab />} />
@@ -803,6 +813,9 @@ export function App() {
           <Route path="projects/:projectId/workspaces" element={<UnprefixedBoardRedirect />} />
           <Route path="projects/:projectId/workspaces/:workspaceId" element={<UnprefixedBoardRedirect />} />
           <Route path="projects/:projectId/configuration" element={<UnprefixedBoardRedirect />} />
+          <Route path="projects/:projectId/assurance" element={<UnprefixedBoardRedirect />} />
+          <Route path="assurance" element={<UnprefixedBoardRedirect />} />
+          <Route path="assurance/dossiers/:dossierId" element={<UnprefixedBoardRedirect />} />
           <Route path="workspaces" element={<UnprefixedBoardRedirect />} />
           <Route path="execution-workspaces/:workspaceId" element={<UnprefixedExecutionWorkspaceRedirect />} />
           <Route path="execution-workspaces/:workspaceId/services" element={<UnprefixedExecutionWorkspaceRedirect />} />

@@ -1,4 +1,5 @@
 import fs from "node:fs/promises";
+import { signalAssuranceJob } from "./assurance/reconciler.js";
 import path from "node:path";
 import { execFile as execFileCallback } from "node:child_process";
 import { promisify } from "node:util";
@@ -10710,6 +10711,24 @@ export function heartbeatService(
         payload: buildHeartbeatRunStatusLiveEventPayload(updated),
       });
       publishRunLifecyclePluginEvent(updated);
+      if (isHeartbeatRunTerminalStatus(updated.status)) {
+        const assuranceIssueId = updated.nativeIssueId
+          ?? (typeof updated.contextSnapshot?.issueId === "string" ? updated.contextSnapshot.issueId : null)
+          ?? (typeof updated.contextSnapshot?.taskId === "string" ? updated.contextSnapshot.taskId : null);
+        void signalAssuranceJob({
+          db,
+          companyId: updated.companyId,
+          kind: "run_record",
+          dedupeKey: `run:${updated.id}:${updated.updatedAt.toISOString()}`,
+          payload: { runId: updated.id },
+        }).then(() => assuranceIssueId ? signalAssuranceJob({
+          db,
+          companyId: updated.companyId,
+          kind: "task_validate",
+          dedupeKey: `run-task:${updated.id}:${updated.updatedAt.toISOString()}`,
+          payload: { issueId: assuranceIssueId },
+        }) : null).catch((err) => logger.warn({ err, runId: updated.id }, "failed to enqueue Assurance reconciliation"));
+      }
     }
 
     return updated;
@@ -10756,6 +10775,24 @@ export function heartbeatService(
         payload: buildHeartbeatRunStatusLiveEventPayload(updated),
       });
       publishRunLifecyclePluginEvent(updated);
+      if (isHeartbeatRunTerminalStatus(updated.status)) {
+        const assuranceIssueId = updated.nativeIssueId
+          ?? (typeof updated.contextSnapshot?.issueId === "string" ? updated.contextSnapshot.issueId : null)
+          ?? (typeof updated.contextSnapshot?.taskId === "string" ? updated.contextSnapshot.taskId : null);
+        void signalAssuranceJob({
+          db,
+          companyId: updated.companyId,
+          kind: "run_record",
+          dedupeKey: `run:${updated.id}:${updated.updatedAt.toISOString()}`,
+          payload: { runId: updated.id },
+        }).then(() => assuranceIssueId ? signalAssuranceJob({
+          db,
+          companyId: updated.companyId,
+          kind: "task_validate",
+          dedupeKey: `run-task:${updated.id}:${updated.updatedAt.toISOString()}`,
+          payload: { issueId: assuranceIssueId },
+        }) : null).catch((err) => logger.warn({ err, runId: updated.id }, "failed to enqueue Assurance reconciliation"));
+      }
       return { run: updated, updated: true as const };
     }
 

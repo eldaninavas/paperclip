@@ -65,7 +65,7 @@ export function ApprovalDetail() {
 
   useEffect(() => {
     setBreadcrumbs([
-      { label: "Approvals", href: "/approvals" },
+      { label: "Por aceptar", href: "/approvals" },
       { label: approval?.id?.slice(0, 8) ?? approvalId ?? "Approval" },
     ]);
   }, [setBreadcrumbs, approval, approvalId]);
@@ -265,11 +265,10 @@ export function ApprovalDetail() {
             <>
               <Button
                 size="sm"
-                className="bg-green-700 hover:bg-green-600 text-white"
                 onClick={() => approveMutation.mutate()}
                 disabled={approveMutation.isPending}
               >
-                Approve
+                Aceptar
               </Button>
               <Button
                 variant="destructive"
@@ -277,7 +276,7 @@ export function ApprovalDetail() {
                 onClick={() => rejectMutation.mutate()}
                 disabled={rejectMutation.isPending}
               >
-                Reject
+                Rechazar
               </Button>
             </>
           )}
@@ -293,7 +292,7 @@ export function ApprovalDetail() {
               onClick={() => revisionMutation.mutate()}
               disabled={revisionMutation.isPending}
             >
-              Request revision
+              Pedir cambios
             </Button>
           )}
           {approval.status === "revision_requested" && (

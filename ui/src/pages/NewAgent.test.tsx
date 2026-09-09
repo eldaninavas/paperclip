@@ -324,6 +324,8 @@ describe("NewAgent Claude subscription login", () => {
     const result = await renderNewAgent();
     roots.push(result.root);
 
+    expect(result.container.querySelector('button[aria-label="Choose agent identity"]')).toBeTruthy();
+
     // Before the test the page shows no login affordance.
     expect(findButton(result.container, "Sign in")).toBeFalsy();
 
@@ -361,6 +363,7 @@ describe("NewAgent Claude subscription login", () => {
       Record<string, unknown>,
     ];
     expect(companyId).toBe("company-1");
+    expect(payload.icon).toBe("agent:v1:hexagon:mint:bright:none");
 
     // The create request carries the non-secret stored-session claim, and the
     // adapter config carries the fixed reference binding.
@@ -418,7 +421,7 @@ describe("NewAgent Claude subscription login", () => {
     const result = await renderNewAgent();
     roots.push(result.root);
 
-    expect(result.container.textContent).not.toContain("Paperclip Runner");
+    expect(result.container.textContent).not.toContain("Foundation Runner");
     expect(result.container.textContent).toContain("Claude Code");
   });
 
@@ -428,6 +431,6 @@ describe("NewAgent Claude subscription login", () => {
     const result = await renderNewAgent();
     roots.push(result.root);
 
-    expect(result.container.textContent).toContain("Paperclip Runner");
+    expect(result.container.textContent).toContain("Foundation Runner");
   });
 });

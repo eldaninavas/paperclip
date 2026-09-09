@@ -366,6 +366,9 @@ export {
   ADAPTER_AGNOSTIC_KEYS,
   AGENT_ICON_NAMES,
   PROJECT_ICON_NAMES,
+  PROJECT_EMOJI_PREFIX,
+  isProjectEmojiIcon,
+  isProjectIconValue,
   ISSUE_STATUSES,
   INBOX_MINE_ISSUE_STATUSES,
   INBOX_MINE_ISSUE_STATUS_FILTER,
@@ -2630,6 +2633,8 @@ export {
 } from "./validators/environment-custom-images.js";
 export * from "./validators/skill-policy.js";
 export * from "./validators/provider-trace.js";
+export * from "./types/assurance.js";
+export * from "./validators/assurance.js";
 export {
   FEATURE_TIERS,
   INSTANCE_FEATURE_CATALOG,

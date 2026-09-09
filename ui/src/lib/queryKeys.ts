@@ -701,4 +701,11 @@ export const queryKeys = {
   adapters: {
     all: ["adapters"] as const,
   },
+  assurance: {
+    overview: (companyId: string) => ["assurance", companyId, "overview"] as const,
+    dossiers: (companyId: string) => ["assurance", companyId, "dossiers"] as const,
+    dossier: (dossierId: string) => ["assurance", "dossier", dossierId] as const,
+    project: (projectId: string) => ["assurance", "project", projectId] as const,
+    issue: (issueId: string) => ["assurance", "issue", issueId] as const,
+  },
 };

@@ -294,11 +294,11 @@ describe("SidebarCompanyMenu", () => {
 
     const trigger = container.querySelector('button[aria-label="Open Acme Labs organization switcher"]');
     expect(trigger).not.toBeNull();
-    expect(trigger?.classList).toContain("px-4");
-    expect(trigger?.classList).toContain("has-[>svg]:px-4");
-    expect(trigger?.classList).toContain("hover:bg-background");
+    expect(trigger?.classList).toContain("px-2");
+    expect(trigger?.classList).toContain("has-[>svg]:px-2");
+    expect(trigger?.classList).toContain("hover:bg-(--foundation-sidebar-hover)");
     expect(trigger?.classList).toContain("hover:text-foreground");
-    expect(trigger?.classList).toContain("dark:hover:bg-background");
+    expect(trigger?.classList).toContain("dark:hover:bg-(--foundation-sidebar-hover)");
     act(() => {
       trigger?.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, button: 0 }));
       trigger?.dispatchEvent(new MouseEvent("click", { bubbles: true }));

@@ -884,7 +884,7 @@ export function TaskChatThread(props: TaskChatThreadProps) {
       if (comment.deletedAt || !comment.runId || !comment.id) continue;
       map.set(comment.runId, comment.id);
     }
-    // A settled Paperclip turn normally attaches to its durable final reply.
+    // A settled Foundation turn normally attaches to its durable final reply.
     // Same-turn steering splits that causal interval into timestamped segments,
     // so each segment must stay unanchored and interleave around the injected
     // human bubble through the chronological assembler.
@@ -2415,6 +2415,7 @@ export function TaskChatThread(props: TaskChatThreadProps) {
                             startedAtMs={tailStartedAtMs}
                             finishedAtMs={tailFinishedAtMs}
                             toolSummary={tailToolSummary}
+                            agentIcon={visibleTailAgentIcon}
                           />
                           <TaskChatLiveTail
                             items={tailItems}

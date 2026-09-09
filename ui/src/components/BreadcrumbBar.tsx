@@ -24,7 +24,7 @@ type GlobalToolbarContext = { companyId: string | null; companyPrefix: string | 
 function CrumbIdentifier({ identifier }: { identifier?: string }) {
   if (!identifier) return null;
   return (
-    <span data-slot="task-title-identifier" className="shrink-0 font-mono text-muted-foreground">
+    <span data-slot="task-title-identifier" className="shrink-0 text-muted-foreground">
       {identifier}
     </span>
   );
@@ -40,7 +40,7 @@ function GlobalToolbar({
   const { slots } = usePluginSlots({ slotTypes: ["globalToolbarButton"], companyId: context.companyId });
   const { launchers } = usePluginLaunchers({ placementZones: ["globalToolbarButton"], companyId: context.companyId, enabled: !!context.companyId });
   return (
-    <div className="ml-auto flex shrink-0 items-center gap-1 pl-2 empty:hidden">
+    <div className="ml-auto flex shrink-0 items-center gap-1 pl-2 empty:hidden [&_button]:h-7 [&_button]:text-xs [&_button]:font-normal [&_svg]:size-3.5">
       {pageToolbar}
       {slots.length > 0 ? (
         <PluginSlotOutlet slotTypes={["globalToolbarButton"]} context={context} className="flex items-center gap-1" />
@@ -82,7 +82,7 @@ export function BreadcrumbBar({ taskDetailLayout = false }: { taskDetailLayout?:
 
   if (isMobile && mobileToolbar) {
     return (
-      <div className="h-(--sz-60px) shrink-0 flex items-center border-b border-border px-2">
+      <div data-slot="context-bar" className="h-(--foundation-toolbar-height) shrink-0 flex items-center border-b border-border/60 bg-background px-2">
         {mobileToolbar}
       </div>
     );
@@ -90,7 +90,7 @@ export function BreadcrumbBar({ taskDetailLayout = false }: { taskDetailLayout?:
 
   if (breadcrumbs.length === 0) {
     return (
-      <div className="h-(--sz-60px) shrink-0 flex items-center justify-end border-b border-border px-4 md:px-6">
+      <div data-slot="context-bar" className="h-(--foundation-toolbar-height) shrink-0 flex items-center justify-end border-b border-border/60 bg-background px-(--foundation-page-gutter) md:px-(--foundation-page-gutter-wide)">
         {globalToolbarSlots}
       </div>
     );
@@ -111,7 +111,7 @@ export function BreadcrumbBar({ taskDetailLayout = false }: { taskDetailLayout?:
   const breadcrumbTrail = (
     <div className="min-w-0 overflow-hidden flex-1">
       <Breadcrumb className="min-w-0 overflow-hidden">
-        <BreadcrumbList className="flex-nowrap">
+        <BreadcrumbList className="flex-nowrap text-[13px]">
           {breadcrumbs.map((crumb, i) => {
             const isLast = i === breadcrumbs.length - 1;
             return (
@@ -138,7 +138,7 @@ export function BreadcrumbBar({ taskDetailLayout = false }: { taskDetailLayout?:
                           to={crumb.href}
                           className={cn(
                             "flex min-w-0 items-center gap-1.5",
-                            i === 0 && "font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground",
+                            i === 0 && "font-medium text-muted-foreground hover:text-foreground",
                           )}
                         >
                           {crumb.leading && (
@@ -153,7 +153,7 @@ export function BreadcrumbBar({ taskDetailLayout = false }: { taskDetailLayout?:
                           to={crumb.href}
                           className={cn(
                             "min-w-0 truncate",
-                            i === 0 && "font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground",
+                            i === 0 && "font-medium text-muted-foreground hover:text-foreground",
                           )}
                         >
                           {crumb.label}
@@ -170,14 +170,14 @@ export function BreadcrumbBar({ taskDetailLayout = false }: { taskDetailLayout?:
     </div>
   );
 
-  // Single breadcrumb = page title (uppercase)
+  // Single breadcrumb = compact page title.
   if (breadcrumbs.length === 1) {
     return (
-      <div className="h-(--sz-60px) shrink-0 flex items-center border-b border-border px-4 md:px-6">
+      <div data-slot="context-bar" className="h-(--foundation-toolbar-height) shrink-0 flex items-center border-b border-border/60 bg-background px-(--foundation-page-gutter) md:px-(--foundation-page-gutter-wide)">
         {menuButton}
         <div className="min-w-0 overflow-hidden flex-1">
           {breadcrumbs[0].leading || breadcrumbs[0].identifier ? (
-            <h1 className="flex items-center gap-1.5 text-sm font-semibold uppercase tracking-wider">
+            <h1 key={breadcrumbs[0].label} data-slot="context-title" className="flex items-center gap-1.5 text-[13px] font-medium">
               {breadcrumbs[0].leading && (
                 <span className="flex shrink-0 items-center">{breadcrumbs[0].leading}</span>
               )}
@@ -185,7 +185,7 @@ export function BreadcrumbBar({ taskDetailLayout = false }: { taskDetailLayout?:
               <span className="truncate">{breadcrumbs[0].label}</span>
             </h1>
           ) : (
-            <h1 className="text-sm font-semibold uppercase tracking-wider truncate">
+            <h1 key={breadcrumbs[0].label} data-slot="context-title" className="truncate text-[13px] font-medium text-foreground/90">
               {breadcrumbs[0].label}
             </h1>
           )}
@@ -198,9 +198,10 @@ export function BreadcrumbBar({ taskDetailLayout = false }: { taskDetailLayout?:
   // Multiple breadcrumbs = breadcrumb trail
   return (
     <div
+      data-slot="context-bar"
       className={cn(
-        "relative h-(--sz-60px) shrink-0 flex items-center border-b border-border",
-        "px-4 md:px-6",
+        "relative h-(--foundation-toolbar-height) shrink-0 flex items-center border-b border-border/60 bg-background",
+        "px-(--foundation-page-gutter) md:px-(--foundation-page-gutter-wide)",
       )}
     >
       {menuButton}
@@ -210,7 +211,7 @@ export function BreadcrumbBar({ taskDetailLayout = false }: { taskDetailLayout?:
         <Button
           variant="ghost"
           size="icon-sm"
-          className="ml-5 size-9 shrink-0 text-muted-foreground"
+          className="ml-3 shrink-0 text-muted-foreground"
           onClick={toggleTaskPanel}
           aria-label={taskPanelOpen ? "Hide properties" : "Show properties"}
           title={taskPanelOpen ? "Hide properties" : "Show properties"}

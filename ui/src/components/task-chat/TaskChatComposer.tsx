@@ -272,7 +272,7 @@ function escapeMarkdownLabel(name: string): string {
  * comp-bar of [attach] [mode chip] … [assignee] [send]. The mode chip is a
  * borderless filled control carrying the pending mode's hue; the composer chrome
  * itself stays neutral. Cmd/Ctrl+. and Shift+Tab cycle modes (captured before
- * Lexical); Cmd/Ctrl+Enter posts via the editor's native onSubmit; plain Enter
+ * Lexical); Enter posts via the editor's native onSubmit, while Shift+Enter
  * stays a newline / next list item. Pasted or dropped images upload through
  * `onAttachImage` (or the `onImageUpload` fallback) and land inline at the
  * caret via the editor's image plugin; non-image files render as shadcn
@@ -680,7 +680,7 @@ export function TaskChatComposer({
     <div
       className={cn(
         streamlined
-          ? "paperclip-task-chat-composer rounded-(--radius-task-composer) border border-border bg-card p-(--sz-18px) shadow-(--shadow-task-composer) dark:border-0 dark:bg-muted dark:shadow-none"
+          ? "paperclip-task-chat-composer rounded-(--radius-task-composer) border border-border/70 bg-card p-3.5 shadow-(--shadow-task-composer) dark:bg-muted/70"
           : "paperclip-task-chat-composer rounded-xl bg-card p-(--sz-18px)",
       )}
       onKeyDownCapture={(e) => {
@@ -708,7 +708,7 @@ export function TaskChatComposer({
           data-testid="task-chat-composer-takeover"
         >
           <div
-            className="mb-3 flex min-w-0 items-center gap-2"
+            className="mb-2.5 flex min-w-0 items-center gap-2"
             data-testid="task-chat-composer-takeover-header"
           >
             <div className="min-w-0 flex-1">
@@ -812,6 +812,7 @@ export function TaskChatComposer({
               readOnly={disabled}
               mentions={mentions}
               onSubmit={() => void submit()}
+              submitOnEnter
               imageUploadHandler={
                 canAcceptFiles ? uploadInlineImage : undefined
               }

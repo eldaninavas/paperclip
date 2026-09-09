@@ -48,7 +48,7 @@ import {
   AGENT_DEFAULT_MAX_CONCURRENT_RUNS,
   ISSUE_PRIORITIES,
   ISSUE_STATUSES,
-  PROJECT_ICON_NAMES,
+  isProjectIconValue,
   PROJECT_STATUSES,
   ROUTINE_CATCH_UP_POLICIES,
   ROUTINE_CONCURRENCY_POLICIES,
@@ -590,7 +590,7 @@ function normalizePortableProjectEnv(value: unknown): AgentEnvConfig | null {
 }
 
 function normalizeProjectIconName(value: string | null | undefined): string | null {
-  return value && PROJECT_ICON_NAMES.includes(value as typeof PROJECT_ICON_NAMES[number]) ? value : null;
+  return value && isProjectIconValue(value) ? value : null;
 }
 
 function extractPortableScopedEnvInputs(

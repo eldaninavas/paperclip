@@ -251,6 +251,7 @@ async function renderForm(
   agentOverrides: Partial<Agent> = {},
   options: {
     showAdapterTestEnvironmentButton?: boolean;
+    showAdapterTypeField?: boolean;
     content?: "configuration" | "secrets";
   } = {},
 ) {
@@ -277,7 +278,7 @@ async function renderForm(
               onSave={vi.fn()}
               hidePromptTemplate
               content={options.content}
-              showAdapterTypeField={false}
+              showAdapterTypeField={options.showAdapterTypeField ?? false}
               showAdapterTestEnvironmentButton={options.showAdapterTestEnvironmentButton ?? false}
             />
           </TooltipProvider>
@@ -604,7 +605,7 @@ async function clickElement(element: Element | null | undefined) {
 }
 
 async function runTest(container: HTMLElement) {
-  await clickByText(container, "Test");
+  await clickByText(container, "Probar conexión");
 }
 
 async function startLogin(container: HTMLElement) {
@@ -858,7 +859,25 @@ describe("AgentConfigForm environment selector", () => {
     expect(selector?.textContent).not.toContain("· sandbox");
   });
 
-  it("renders non-local adapter config fields in the Adapter card", async () => {
+  it("presents AI execution as clear connection modes", async () => {
+    const result = await renderForm([
+      makeEnvironment({ id: "local-1", name: "Local", driver: "local" }),
+    ], {}, { showAdapterTypeField: true });
+    roots.push(result.root);
+
+    expect(result.container.textContent).toContain("Conexión de IA");
+    expect(result.container.textContent).toContain("En este equipo");
+    expect(result.container.textContent).toContain("Runner remoto");
+    expect(result.container.textContent).toContain("API / servidor");
+    const localModeButton = Array.from(result.container.querySelectorAll("button")).find(
+      (button) => button.textContent?.includes("En este equipo"),
+    );
+    expect(localModeButton?.getAttribute("aria-pressed")).toBe("true");
+    expect(result.container.textContent).toContain("Usa una cuenta o suscripción iniciada localmente");
+    expect(result.container.textContent).not.toContain("Adapter type");
+  });
+
+  it("renders non-local adapter config fields in the AI connection card", async () => {
     const result = await renderForm(
       [makeEnvironment({ id: "local-1", name: "Local", driver: "local" })],
       {
@@ -906,7 +925,7 @@ describe("AgentConfigForm environment selector", () => {
     await flushReact();
 
     const testButton = Array.from(result.container.querySelectorAll("button")).find(
-      (button) => button.textContent?.trim() === "Test",
+      (button) => button.textContent?.trim() === "Probar conexión",
     );
     expect(testButton).toBeTruthy();
 
@@ -937,7 +956,7 @@ describe("AgentConfigForm environment selector", () => {
     roots.push(result.root);
 
     const testButton = Array.from(result.container.querySelectorAll("button")).find(
-      (button) => button.textContent?.trim() === "Test",
+      (button) => button.textContent?.trim() === "Probar conexión",
     );
     expect(testButton).toBeTruthy();
 
@@ -978,7 +997,7 @@ describe("AgentConfigForm environment selector", () => {
     await flushReact();
 
     const testButton = Array.from(result.container.querySelectorAll("button")).find(
-      (button) => button.textContent?.trim() === "Test",
+      (button) => button.textContent?.trim() === "Probar conexión",
     );
     expect(testButton).toBeTruthy();
 
@@ -1014,7 +1033,7 @@ describe("AgentConfigForm environment selector", () => {
     roots.push(result.root);
 
     const testButton = Array.from(result.container.querySelectorAll("button")).find(
-      (button) => button.textContent?.trim() === "Test",
+      (button) => button.textContent?.trim() === "Probar conexión",
     );
     expect(testButton).toBeTruthy();
 
@@ -2320,7 +2339,7 @@ describe("AgentConfigForm environment selector", () => {
       });
       await flushFake();
 
-      await clickFake(container, "Test");
+      await clickFake(container, "Probar conexión");
       await clickFake(container, "Sign in");
 
       // The login is active: both polls have run at least once.

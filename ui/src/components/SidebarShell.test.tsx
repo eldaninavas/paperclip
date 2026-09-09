@@ -84,8 +84,8 @@ describe("SidebarShell", () => {
       separator!.dispatchEvent(pointerEvent("pointerup", 320));
     });
 
-    expect(panel().style.width).toBe("320px");
-    expect(window.localStorage.getItem("test.sidebar.width")).toBe("320");
+    expect(panel().style.width).toBe("304px");
+    expect(window.localStorage.getItem("test.sidebar.width")).toBe("304");
   });
 
   it("matches the properties panel resize-grip hover treatment", () => {
@@ -122,13 +122,13 @@ describe("SidebarShell", () => {
     act(() => {
       separator?.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }));
     });
-    expect(panel().style.width).toBe("256px");
-    expect(window.localStorage.getItem("test.sidebar.width")).toBe("256");
+    expect(panel().style.width).toBe("240px");
+    expect(window.localStorage.getItem("test.sidebar.width")).toBe("240");
 
     act(() => {
       separator?.dispatchEvent(new KeyboardEvent("keydown", { key: "Home", bubbles: true }));
     });
-    expect(panel().style.width).toBe("208px");
+    expect(panel().style.width).toBe("192px");
 
     act(() => {
       separator?.dispatchEvent(new KeyboardEvent("keydown", { key: "End", bubbles: true }));
@@ -146,7 +146,7 @@ describe("SidebarShell", () => {
     });
 
     expect(handle()).toBeNull();
-    expect(panel().style.width).toBe("240px");
+    expect(panel().style.width).toBe("224px");
   });
 
   it("reserves only the rail width when collapsed and hides the resize handle", () => {
