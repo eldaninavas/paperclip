@@ -282,14 +282,14 @@ function autocompleteOption(matchText: string) {
 }
 
 describe("TaskChatComposer", () => {
-  it("adds 10px to the composer's original 8px interior padding", () => {
+  it("uses compact 14px interior padding", () => {
     render(<TaskChatComposer onAdd={async () => {}} workMode="standard" />);
 
     const composer = container.querySelector(
       '[data-testid="task-chat-composer-input"]',
     )?.parentElement;
 
-    expect(composer?.className).toContain("p-(--sz-18px)");
+    expect(composer?.className).toContain("p-3.5");
     expect(composer?.className).not.toContain("p-2");
   });
 
@@ -310,7 +310,7 @@ describe("TaskChatComposer", () => {
     expect(actions?.classList).not.toContain("mt-1");
   });
 
-  it("renders a light card shell while preserving the borderless dark treatment", () => {
+  it("renders the same restrained card shell in light and dark themes", () => {
     render(
       <TaskChatComposer
         onAdd={async () => {}}
@@ -331,12 +331,10 @@ describe("TaskChatComposer", () => {
     )!;
 
     expect(composer.classList).toContain("border");
-    expect(composer.classList).toContain("border-border");
+    expect(composer.classList).toContain("border-border/70");
     expect(composer.classList).toContain("bg-card");
     expect(composer.classList).toContain("shadow-(--shadow-task-composer)");
-    expect(composer.classList).toContain("dark:border-0");
-    expect(composer.classList).toContain("dark:bg-muted");
-    expect(composer.classList).toContain("dark:shadow-none");
+    expect(composer.classList).toContain("dark:bg-muted/70");
     expect(composer.className).not.toContain("focus-within:ring");
     expect(mode.classList).not.toContain("border");
     expect(mode.className).not.toContain("ring-");
@@ -386,12 +384,22 @@ describe("TaskChatComposer", () => {
     expect(onAdd).toHaveBeenCalledWith("hello", undefined, undefined);
   });
 
-  it("does not submit on plain Enter or Shift+Enter (newline stays with the editor)", async () => {
+  it("submits on plain Enter", async () => {
+    const onAdd = vi.fn().mockResolvedValue(undefined);
+    render(<TaskChatComposer onAdd={onAdd} workMode="standard" />);
+
+    typeText("hello");
+    pressKey("Enter");
+    await flushAsync();
+
+    expect(onAdd).toHaveBeenCalledWith("hello", undefined, undefined);
+  });
+
+  it("does not submit on Shift+Enter (newline stays with the editor)", async () => {
     const onAdd = vi.fn().mockResolvedValue(undefined);
     render(<TaskChatComposer onAdd={onAdd} workMode="standard" />);
 
     typeText("line one");
-    pressKey("Enter");
     pressKey("Enter", { shiftKey: true });
     await flushAsync();
 

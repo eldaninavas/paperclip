@@ -1,4 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
+import { markAssuranceTaskStale } from "../services/assurance/task-validator.js";
+import { signalAssuranceJob } from "../services/assurance/reconciler.js";
 import { Router, type Request, type Response } from "express";
 import multer from "multer";
 import { z } from "zod";
@@ -8450,6 +8452,10 @@ export function issueRoutes(
       workProductChanged: true,
     });
     await materializeArtifactReviewDocumentBestEffort({ issue, workProduct: product, actor });
+    await markAssuranceTaskStale(db, issue.companyId, [issue.id]);
+    if (["in_review", "done"].includes(issue.status)) {
+      await signalAssuranceJob({ db, companyId: issue.companyId, kind: "task_validate", dedupeKey: `work-product:${product.id}:${product.updatedAt.toISOString()}`, payload: { issueId: issue.id } });
+    }
     res.status(201).json(product);
   });
 
@@ -8754,6 +8760,10 @@ export function issueRoutes(
     if (reviewDocumentInputChanged || sourceTrust) {
       await materializeArtifactReviewDocumentBestEffort({ issue, workProduct: product, actor });
     }
+    await markAssuranceTaskStale(db, issue.companyId, [issue.id]);
+    if (["in_review", "done"].includes(issue.status)) {
+      await signalAssuranceJob({ db, companyId: issue.companyId, kind: "task_validate", dedupeKey: `work-product:${product.id}:${product.updatedAt.toISOString()}`, payload: { issueId: issue.id } });
+    }
     res.json(product);
   });
 
@@ -8792,6 +8802,10 @@ export function issueRoutes(
       actor,
       workProductChanged: true,
     });
+    await markAssuranceTaskStale(db, issue.companyId, [issue.id]);
+    if (["in_review", "done"].includes(issue.status)) {
+      await signalAssuranceJob({ db, companyId: issue.companyId, kind: "task_validate", dedupeKey: `work-product-deleted:${removed.id}`, payload: { issueId: issue.id } });
+    }
     res.json(removed);
   });
 
@@ -9050,6 +9064,13 @@ export function issueRoutes(
       onboardingFirstTask: rawOnboardingFirstTask,
       ...rawCreateBody
     } = sanitizedBody;
+    if (req.actor.type === "agent" && rawCreateBody.status === "done") {
+      res.status(422).json({
+        error: "An agent cannot create a completed task. Submit the task for human review instead.",
+        code: "human_review_required",
+      });
+      return;
+    }
     // The onboarding first-task marker grants privileged, server-owned behavior:
     // it stamps the onboarding origin (which suppresses the seeded description in
     // the UI) and seeds a comment authored *as the assigned agent*. Honor it only
@@ -9122,6 +9143,9 @@ export function issueRoutes(
       : await resolveRunIssueWorkspaceInheritanceSource(companyId, actor);
     const createBody = {
       ...rawCreateBody,
+      // Foundation's core guarantee: completion always has a human decision
+      // boundary, regardless of what an API client asks for at creation time.
+      reviewPolicy: "human_only" as const,
       parentId: effectiveParentId,
       ...(normalizedAssigneeAgentId !== undefined ? { assigneeAgentId: normalizedAssigneeAgentId } : {}),
       ...(runWorkspaceInheritanceSourceIssueId
@@ -9387,8 +9411,16 @@ export function issueRoutes(
     });
     const createBody = {
       ...sanitizedBody,
+      reviewPolicy: "human_only" as const,
       ...(normalizedAssigneeAgentId !== undefined ? { assigneeAgentId: normalizedAssigneeAgentId } : {}),
     };
+    if (req.actor.type === "agent" && sanitizedBody.status === "done") {
+      res.status(422).json({
+        error: "An agent cannot create a completed task. Submit the task for human review instead.",
+        code: "human_review_required",
+      });
+      return;
+    }
     const childAssignmentScope = {
       projectId: createBody.projectId ?? parent.projectId ?? null,
       parentIssueId: parent.id,
@@ -9972,6 +10004,17 @@ export function issueRoutes(
       req.body.reviewPolicy !== undefined
       || updateFields.status === "done"
       || updateFields.status === "cancelled";
+    if (
+      req.actor.type === "agent"
+      && updateFields.status === "done"
+      && existing.status !== "in_review"
+    ) {
+      res.status(422).json({
+        error: "Human review is required before this task can be completed. Move it to in_review first.",
+        code: "human_review_required",
+      });
+      return;
+    }
     if (
       (reviewVerdictRequested || reviewPolicyChangeRequested)
       && existing.reviewPolicy != null
@@ -11486,6 +11529,16 @@ export function issueRoutes(
     })();
 
     await queueTaskWatchdogEvaluation(issue, actor.runId);
+    await markAssuranceTaskStale(db, issue.companyId, [issue.id]);
+    if (["in_review", "done"].includes(issue.status)) {
+      await signalAssuranceJob({
+        db,
+        companyId: issue.companyId,
+        kind: "task_validate",
+        dedupeKey: `task:${issue.id}:${issue.updatedAt.toISOString()}`,
+        payload: { issueId: issue.id },
+      });
+    }
     const changes = issueResponse.changes ?? {};
     if (prefersMinimalIssueUpdateResponse(req)) {
       res.setHeader("Preference-Applied", "return=minimal");
@@ -14208,6 +14261,10 @@ export function issueRoutes(
     }
 
     const { artifactWorkProductId: _artifactWorkProductId, ...attachmentResponse } = attachment;
+    await markAssuranceTaskStale(db, issue.companyId, [issue.id]);
+    if (["in_review", "done"].includes(issue.status)) {
+      await signalAssuranceJob({ db, companyId: issue.companyId, kind: "task_validate", dedupeKey: `attachment:${attachment.id}`, payload: { issueId: issue.id } });
+    }
     res.status(201).json(withContentPath(attachmentResponse));
   });
 
@@ -14320,6 +14377,11 @@ export function issueRoutes(
         attachmentId: removed.id,
       },
     });
+
+    await markAssuranceTaskStale(db, issue.companyId, [issue.id]);
+    if (["in_review", "done"].includes(issue.status)) {
+      await signalAssuranceJob({ db, companyId: issue.companyId, kind: "task_validate", dedupeKey: `attachment-deleted:${removed.id}`, payload: { issueId: issue.id } });
+    }
 
     res.json({ ok: true });
   });

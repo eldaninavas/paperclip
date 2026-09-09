@@ -264,7 +264,11 @@ describe("ProjectDetail", () => {
     });
 
     const props = mockIssuesList.mock.calls.at(-1)?.[0];
-    expect(props).toEqual(expect.objectContaining({ projectId: "project-1" }));
+    expect(props).toEqual(expect.objectContaining({
+      projectId: "project-1",
+      rowPresentation: "task",
+      toolbarPresentation: "collection",
+    }));
     expect(props).not.toHaveProperty("projectTimelineHref");
   });
 

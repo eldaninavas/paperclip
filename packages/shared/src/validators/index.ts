@@ -973,5 +973,6 @@ export {
   type RevokeToolTrustRule,
 } from "./tool-access.js";
 export * from "./skill-policy.js";
+export * from "./assurance.js";
 export * from "./provider-trace.js";
 export * from "./app-definition.js";

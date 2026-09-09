@@ -5,6 +5,8 @@ import { activityLog, agents, companies, costEvents, heartbeatRuns, issues, proj
 import { notFound, unprocessable } from "../errors.js";
 import { budgetService, type BudgetServiceHooks } from "./budgets.js";
 import { visibleIssueCondition } from "./issue-visibility.js";
+import { markAssuranceTaskStale } from "./assurance/task-validator.js";
+import { signalAssuranceJob } from "./assurance/reconciler.js";
 
 export interface CostDateRange {
   from?: Date;
@@ -98,6 +100,23 @@ export function costService(db: Db, budgetHooks: BudgetServiceHooks = {}) {
         .where(eq(companies.id, companyId));
 
       await budgets.evaluateCostEvent(event);
+
+      if (event.issueId) {
+        const issue = await db.select({ status: issues.status }).from(issues).where(and(
+          eq(issues.id, event.issueId),
+          eq(issues.companyId, companyId),
+        )).limit(1).then((rows) => rows[0] ?? null);
+        if (issue && ["in_review", "done"].includes(issue.status)) {
+          await markAssuranceTaskStale(db, companyId, [event.issueId]);
+          await signalAssuranceJob({
+            db,
+            companyId,
+            kind: "task_validate",
+            dedupeKey: `cost:${event.id}`,
+            payload: { issueId: event.issueId },
+          });
+        }
+      }
 
       return event;
     },

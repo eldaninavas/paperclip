@@ -51,10 +51,10 @@ function RecentTasksList({
   if (rail && entries.length === 0) return null;
 
   return (
-    <SidebarSection label="Recent Tasks">
+    <SidebarSection label="Recientes">
       {entries.length === 0 ? (
         <p className="mx-3 px-2 py-1 text-(length:--text-micro) leading-snug text-muted-foreground/70">
-          Open or create a task to keep it close at hand.
+          Aquí aparecen los trabajos que consultas.
         </p>
       ) : entries.map((entry) => (
         <SidebarNavItem

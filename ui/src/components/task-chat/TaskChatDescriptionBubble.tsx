@@ -17,7 +17,7 @@ import { formatTaskChatTimestamp } from "./task-chat-adapter";
 export interface TaskChatIssueBrief {
   /** LIVE issue.description (never a frozen copy) — empty string when unset. */
   description: string;
-  /** Originating actor: human-created → blue user bubble, agent-created → agent-side bubble. */
+  /** Originating actor: human-created → user bubble, agent-created → agent-side bubble. */
   author: "human" | "agent";
   /** Creating agent's name, shown in the agent-side avatar header. */
   authorName?: string;
@@ -36,8 +36,8 @@ interface TaskChatDescriptionBubbleProps {
   brief: TaskChatIssueBrief;
 }
 
-/** ~12 text-sm lines (20px line-height) — the accepted fold default (PAP-375). */
-const FOLD_COLLAPSED_HEIGHT_PX = 240;
+/** Keep a long task brief subordinate to the conversation. */
+const FOLD_COLLAPSED_HEIGHT_PX = 128;
 
 function initialsForName(name: string) {
   const parts = name.trim().split(/\s+/);
@@ -49,11 +49,11 @@ function initialsForName(name: string) {
 
 /**
  * The task description as the requester's first chat bubble (PAP-375):
- * human-created tasks get the blue user bubble, agent-created tasks the
+ * Human-created tasks get the quiet user bubble; agent-created tasks get the
  * agent-side card with the avatar header — same chrome as TaskChatBubble. The
- * body is the live issue.description. Human-authored blue bubbles are
- * presentation-only; agent-authored descriptions retain the hover edit
- * affordance. Long descriptions fold at ~12 lines behind a Show more curtain;
+ * body is the live issue.description. Human-authored bubbles are presentation-
+ * only; agent-authored descriptions retain the hover edit affordance. Long
+ * descriptions fold early behind a Show more curtain;
  * an empty description renders a muted ghost row that opens the editor — never
  * an empty bubble.
  */
@@ -135,22 +135,17 @@ export function TaskChatDescriptionBubble({ brief }: TaskChatDescriptionBubblePr
       >
         <div
           className={cn(
-            "max-w-(--pct-85) break-words px-3.5 py-2 text-sm",
+            "max-w-(--pct-72) break-words rounded-xl px-3 py-2 text-[13px] leading-5",
             isHuman
-              ? "rounded-2xl rounded-br-sm bg-(--liveness-blue) text-white"
-              : "rounded-2xl rounded-bl-sm bg-(--bubble-agent) text-foreground",
+              ? "rounded-br-sm bg-muted text-foreground ring-1 ring-border/60"
+              : "rounded-bl-sm bg-(--bubble-agent) text-foreground ring-1 ring-border/50",
           )}
         >
           <FoldCurtain
             collapsedHeight={FOLD_COLLAPSED_HEIGHT_PX}
-            // The curtain's fade is a mask (background-agnostic); only the
-            // toggle's muted colors need a lift on the solid blue bubble.
-            toggleClassName={isHuman ? "text-white/80 hover:text-white hover:bg-white/10" : undefined}
+            toggleClassName="text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
           >
             <MarkdownBody
-              // On the solid --liveness-blue human bubble, keep prose body text
-              // following the bubble's `text-white` in both themes.
-              className={isHuman ? "paperclip-markdown-on-accent" : undefined}
               softBreaks
               linkIssueReferences
               externalReferences={brief.externalReferences}

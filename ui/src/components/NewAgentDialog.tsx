@@ -29,6 +29,10 @@ import { getAdapterDisplay } from "../adapters/adapter-display-registry";
 import { useDisabledAdaptersSync } from "../adapters/use-disabled-adapters";
 import { useToast } from "../context/ToastContext";
 import { Badge } from "@/components/ui/badge";
+import { AgentIcon, AgentIdentityStudio } from "./AgentIconPicker";
+import { DEFAULT_AGENT_IDENTITY, serializeAgentIdentity } from "./AgentIdentity";
+
+const DEFAULT_IDENTITY = serializeAgentIdentity(DEFAULT_AGENT_IDENTITY);
 
 /**
  * Adapter types that are suitable for agent creation (excludes internal
@@ -36,7 +40,7 @@ import { Badge } from "@/components/ui/badge";
  */
 const SYSTEM_ADAPTER_TYPES = new Set(["process", "http"]);
 
-type NewAgentDialogMode = "choices" | "runtime" | "invite" | "prompt";
+type NewAgentDialogMode = "choices" | "identity" | "runtime" | "invite" | "prompt";
 
 function isAgentAdapterType(type: string): boolean {
   return !SYSTEM_ADAPTER_TYPES.has(type);
@@ -50,6 +54,7 @@ export function NewAgentDialog() {
   const queryClient = useQueryClient();
   const [mode, setMode] = useState<NewAgentDialogMode>("choices");
   const [agentMessage, setAgentMessage] = useState("");
+  const [agentIcon, setAgentIcon] = useState(DEFAULT_IDENTITY);
   const [latestAgentPrompt, setLatestAgentPrompt] = useState<string | null>(null);
   const [latestAgentPromptCopied, setLatestAgentPromptCopied] = useState(false);
   const disabledTypes = useDisabledAdaptersSync();
@@ -57,6 +62,7 @@ export function NewAgentDialog() {
   function resetDialogState() {
     setMode("choices");
     setAgentMessage("");
+    setAgentIcon(DEFAULT_IDENTITY);
     setLatestAgentPrompt(null);
     setLatestAgentPromptCopied(false);
   }
@@ -127,7 +133,7 @@ export function NewAgentDialog() {
     openNewIssue({
       assigneeAgentId: ceoAgent?.id,
       title: "Create a new agent",
-      description: "(type in what kind of agent you want here)",
+      description: `(type in what kind of agent you want here)\n\nPreferred agent identity: ${agentIcon}`,
     });
   }
 
@@ -142,7 +148,7 @@ export function NewAgentDialog() {
   function handleAdvancedAdapterPick(adapterType: string) {
     closeNewAgent();
     resetDialogState();
-    navigate(`/agents/new?adapterType=${encodeURIComponent(adapterType)}`);
+    navigate(`/agents/new?adapterType=${encodeURIComponent(adapterType)}&icon=${encodeURIComponent(agentIcon)}`);
   }
 
   async function copyText(text: string, unavailableBody: string) {
@@ -252,38 +258,63 @@ export function NewAgentDialog() {
         <div className="min-h-0 overflow-y-auto p-6 space-y-6">
           {mode === "choices" ? (
             <>
-              {/* Recommendation */}
-              <div className="text-center space-y-3">
-                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-accent">
-                  <Bot className="h-6 w-6 text-foreground" />
+              <button
+                type="button"
+                aria-label="Customize agent identity"
+                onClick={() => setMode("identity")}
+                className="flex w-full items-center gap-3 rounded-lg border border-border bg-(--foundation-surface-subtle) p-3 text-left transition-colors hover:bg-accent/50"
+              >
+                <span className="flex size-14 shrink-0 items-center justify-center rounded-lg bg-background">
+                  <AgentIcon icon={agentIcon} className="size-11" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-medium">Agent identity</span>
+                  <span className="block text-xs text-muted-foreground">Shape, color and personality</span>
+                </span>
+                <span className="text-xs font-medium text-muted-foreground">Customize</span>
+              </button>
+
+              <div className="space-y-2">
+                <div>
+                  <h2 className="text-sm font-medium">How should this agent join?</h2>
+                  <p className="text-xs text-muted-foreground">Choose one path. You can change its configuration later.</p>
                 </div>
-                <p className="text-sm text-muted-foreground">
-                  Ask a leader to propose the hire, configure a runtime yourself,
-                  or send an onboarding prompt to an external agent.
-                </p>
-              </div>
-
-              <Button className="w-full" size="lg" onClick={handleAskCeo}>
-                <Bot className="h-4 w-4 mr-2" />
-                Ask the CEO to create a new agent
-              </Button>
-
-              <div className="grid gap-2">
+                <Button className="w-full" size="lg" onClick={handleAskCeo}>
+                  <Bot className="h-4 w-4 mr-2" />
+                  Ask the CEO to create a new agent
+                </Button>
                 <Button variant="outline" className="w-full" onClick={handleAdvancedConfig}>
                   <Settings2 className="h-4 w-4 mr-2" />
                   Configure a runtime manually
                 </Button>
-                <div className="space-y-1">
-                  <Button variant="outline" className="w-full" onClick={handleInviteExternalAgent}>
-                    <MailPlus className="h-4 w-4 mr-2" />
-                    Invite an external agent
-                  </Button>
-                  <p className="text-xs text-muted-foreground text-center">
-                    (OpenClaw, Hermes, or any agent that can call the invite API.)
-                  </p>
-                </div>
+                <Button variant="outline" className="w-full" onClick={handleInviteExternalAgent}>
+                  <MailPlus className="h-4 w-4 mr-2" />
+                  Invite an external agent
+                </Button>
               </div>
             </>
+          ) : mode === "identity" ? (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <button
+                  className="inline-flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
+                  onClick={() => setMode("choices")}
+                >
+                  <ArrowLeft className="h-3.5 w-3.5" />
+                  Back
+                </button>
+                <div>
+                  <h2 className="text-sm font-medium">Choose an identity</h2>
+                  <p className="text-xs text-muted-foreground">This character will represent the agent everywhere.</p>
+                </div>
+              </div>
+
+              <AgentIdentityStudio value={agentIcon} onChange={setAgentIcon} compact />
+
+              <Button className="w-full" onClick={() => setMode("choices")}>
+                Use this identity
+              </Button>
+            </div>
           ) : mode === "runtime" ? (
             <>
               <div className="space-y-2">
@@ -295,7 +326,7 @@ export function NewAgentDialog() {
                   Back
                 </button>
                 <p className="text-sm text-muted-foreground">
-                  Choose the runtime Paperclip should start or resume directly.
+                  Choose the runtime Foundation should start or resume directly.
                 </p>
               </div>
 
@@ -340,7 +371,7 @@ export function NewAgentDialog() {
                 <div className="space-y-1">
                   <h2 className="text-sm font-semibold">Invite an external agent</h2>
                   <p className="text-sm text-muted-foreground">
-                    Generate a one-time onboarding prompt that any compatible agent can use to request access, wait for approval, and claim its Paperclip API key.
+                    Generate a one-time onboarding prompt that any compatible agent can use to request access, wait for approval, and claim its Foundation API key.
                   </p>
                 </div>
               </div>

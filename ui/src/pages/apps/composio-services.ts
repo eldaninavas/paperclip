@@ -87,7 +87,7 @@ export interface ComposioServiceRow {
   state: ComposioServiceState;
   /** Raw Composio account status (`ACTIVE`, `INITIALIZING`, `EXPIRED`, …), for the detail line. */
   connectedAccountStatus: string | null;
-  /** The Paperclip child connection for this toolkit, once one exists. */
+  /** The Foundation child connection for this toolkit, once one exists. */
   childConnectionId: string | null;
   /** Number of tools the toolkit exposes, when Composio reports it. */
   toolCount: number | null;

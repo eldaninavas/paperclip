@@ -166,7 +166,7 @@ function SidebarAgentItem({
     <SidebarNavItem
       to={href}
       label={agent.name}
-      iconNode={<AgentIcon icon={agent.icon} className="shrink-0 h-4 w-4" />}
+      iconNode={<AgentIcon icon={agent.icon} status={agent.status} className="shrink-0 h-4 w-4" />}
       active={isActive}
       liveCount={runCount}
       labelClassName={showBuiltInLifecycle ? "min-w-(--sz-4_5rem) flex-initial" : undefined}

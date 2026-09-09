@@ -10,10 +10,10 @@ export function FrontDoor({ onChoose }: FrontDoorProps) {
     <div className="flex flex-col items-center justify-center min-h-(--sz-60vh) px-8">
       <div className="text-center mb-10">
         <h2 className="text-2xl font-bold tracking-tight">
-          Welcome to Paperclip
+          Empieza en Foundation
         </h2>
-        <p className="text-sm text-muted-foreground mt-2">
-          How would you like to get started?
+        <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-muted-foreground">
+          Crea el trabajo, asígnalo a agentes de IA y conserva la decisión final en manos humanas.
         </p>
       </div>
 
@@ -30,9 +30,9 @@ export function FrontDoor({ onChoose }: FrontDoorProps) {
             <Rocket className="h-6 w-6" />
           </div>
           <div>
-            <h3 className="font-semibold text-sm">Build a new organization</h3>
+            <h3 className="font-semibold text-sm">Crear una organización</h3>
             <p className="text-xs text-muted-foreground mt-1">
-              Begin with a mission, bring on a lead agent, and grow a team of agents to do the work.
+              Define su misión, crea el primer proyecto e incorpora agentes para ejecutarlo.
             </p>
           </div>
         </button>
@@ -49,9 +49,9 @@ export function FrontDoor({ onChoose }: FrontDoorProps) {
             <Zap className="h-6 w-6" />
           </div>
           <div>
-            <h3 className="font-semibold text-sm">Add agents to your org</h3>
+            <h3 className="font-semibold text-sm">Incorporar agentes</h3>
             <p className="text-xs text-muted-foreground mt-1">
-              Bring AI agents into your existing team or workflows.
+              Conecta agentes de IA a un equipo existente bajo revisión humana.
             </p>
           </div>
         </button>

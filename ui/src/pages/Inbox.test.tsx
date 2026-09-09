@@ -508,10 +508,10 @@ describe("Inbox toolbar", () => {
       .filter((button) => button.textContent === "Approve" || button.textContent === "Reject");
     expect(approvalActions.length).toBeGreaterThanOrEqual(2);
     approvalActions.forEach((button) => {
-      expect(button.className).toContain("h-8");
-      expect(button.className).toContain("min-w-(--sz-64px)");
       expect(button.className).toContain("justify-center");
     });
+    expect(approvalActions.some((button) => button.className.includes("h-6") && button.className.includes("min-w-14"))).toBe(true);
+    expect(approvalActions.some((button) => button.className.includes("h-8") && button.className.includes("min-w-(--sz-64px)"))).toBe(true);
 
     act(() => root.unmount());
   });

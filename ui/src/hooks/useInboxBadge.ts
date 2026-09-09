@@ -22,6 +22,7 @@ import {
   saveDismissedInboxAlerts,
   loadReadInboxItems,
   saveReadInboxItems,
+  READ_ITEMS_CHANGED_EVENT,
   READ_ITEMS_KEY,
 } from "../lib/inbox";
 
@@ -148,12 +149,19 @@ export function useReadInboxItems() {
   const [readItems, setReadItems] = useState<Set<string>>(loadReadInboxItems);
 
   useEffect(() => {
-    const handleStorage = (event: StorageEvent) => {
-      if (event.key !== READ_ITEMS_KEY) return;
+    const refreshReadItems = () => {
       setReadItems(loadReadInboxItems());
     };
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key !== READ_ITEMS_KEY) return;
+      refreshReadItems();
+    };
     window.addEventListener("storage", handleStorage);
-    return () => window.removeEventListener("storage", handleStorage);
+    window.addEventListener(READ_ITEMS_CHANGED_EVENT, refreshReadItems);
+    return () => {
+      window.removeEventListener("storage", handleStorage);
+      window.removeEventListener(READ_ITEMS_CHANGED_EVENT, refreshReadItems);
+    };
   }, []);
 
   const markRead = (id: string) => {
@@ -179,6 +187,7 @@ export function useReadInboxItems() {
 
 export function useInboxBadge(companyId: string | null | undefined) {
   const locallyArchivedIssueIds = useLocalInboxArchiveIssueIds(companyId);
+  const { readItems } = useReadInboxItems();
   const { dismissed: dismissedAlerts } = useDismissedInboxAlerts();
   const { dismissedAtByKey } = useInboxDismissals(companyId);
   const { data: session } = useQuery({
@@ -269,7 +278,8 @@ export function useInboxBadge(companyId: string | null | undefined) {
         dismissedAlerts,
         dismissedAtByKey,
         currentUserId,
+        readItems,
       }),
-    [approvals, joinRequests, dashboard, heartbeatRuns, mineIssues, dismissedAlerts, dismissedAtByKey, currentUserId],
+    [approvals, joinRequests, dashboard, heartbeatRuns, mineIssues, dismissedAlerts, dismissedAtByKey, currentUserId, readItems],
   );
 }

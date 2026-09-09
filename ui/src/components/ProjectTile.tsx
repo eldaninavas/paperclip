@@ -1,12 +1,13 @@
 import { cn } from "../lib/utils";
 import { getProjectIcon } from "../lib/project-icons";
+import { PROJECT_EMOJI_PREFIX, isProjectEmojiIcon } from "@paperclipai/shared";
 
 /**
  * Reusable project tile (IA Phase 3 — PAP-58; icon picker added PAP-68 part 3).
  *
- * Default render is a neutral gray rounded rectangle with a folder icon.
+ * Default render is a neutral gray rounded rectangle with a cube icon.
  * An optional `color` tints the background; an optional `icon` selects which
- * Lucide glyph to render (defaults to `folder`).
+ * Lucide glyph to render (defaults to `box`).
  *
  * Used by the Projects list rows and the project detail header. Both `color`
  * and `icon` live on the project itself (`project.color` / `project.icon`).
@@ -24,7 +25,7 @@ const SIZE_STYLES: Record<ProjectTileSize, { box: string; icon: string }> = {
 export interface ProjectTileProps {
   /** Optional project color. When unset, the tile stays neutral gray. */
   color?: string | null;
-  /** Optional Lucide icon name. When unset, defaults to `folder`. */
+  /** Optional Lucide icon name. When unset, defaults to `box`. */
   icon?: string | null;
   size?: ProjectTileSize;
   className?: string;
@@ -33,7 +34,12 @@ export interface ProjectTileProps {
 export function ProjectTile({ color, icon, size = "md", className }: ProjectTileProps) {
   const dims = SIZE_STYLES[size];
   const tinted = Boolean(color);
-  const Icon = getProjectIcon(icon);
+  const emoji = icon && isProjectEmojiIcon(icon)
+    ? icon.slice(PROJECT_EMOJI_PREFIX.length)
+    : null;
+  // Older projects persisted the previous default (`folder`). Keep those rows
+  // aligned with Foundation's project language without requiring a data migration.
+  const Icon = getProjectIcon(icon === "folder" ? "box" : icon);
 
   return (
     <span
@@ -46,7 +52,11 @@ export function ProjectTile({ color, icon, size = "md", className }: ProjectTile
       )}
       style={tinted ? { backgroundColor: color ?? undefined } : undefined}
     >
-      <Icon className={dims.icon} />
+      {emoji ? (
+        <span className={cn("flex items-center justify-center leading-none", dims.icon)}>{emoji}</span>
+      ) : (
+        <Icon className={dims.icon} />
+      )}
     </span>
   );
 }

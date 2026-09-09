@@ -76,6 +76,8 @@ export interface IssueRowProps {
   chevronInGuide?: boolean;
   /** Legacy-only opt in to a bottom divider; canonical task rows stay divider-free. */
   showDivider?: boolean;
+  /** Uses the tighter leading gutter required by narrow master-detail lists such as Inbox. */
+  compactLeadingGutter?: boolean;
 }
 
 export function InboxArchiveButton({
@@ -147,6 +149,7 @@ export function IssueRow({
   treeGuides = 0,
   chevronInGuide = false,
   showDivider = false,
+  compactLeadingGutter = false,
 }: IssueRowProps) {
   const issuePathId = issue.identifier ?? issue.id;
   const identifier = issue.identifier ?? issue.id.slice(0, 8);
@@ -172,14 +175,16 @@ export function IssueRow({
         }
       }}
       className={cn(
-        "inline-flex h-4 w-4 items-center justify-center rounded-full transition-colors",
+        "inline-flex h-4 items-center justify-center rounded-full transition-colors",
+        compactLeadingGutter ? "w-2" : "w-4",
         selected ? "hover:bg-muted/80" : "hover:bg-blue-500/20",
       )}
       aria-label="Mark as read"
     >
       <span
         className={cn(
-          "block h-2 w-2 rounded-full transition-opacity duration-300",
+          "block rounded-full transition-opacity duration-300",
+          compactLeadingGutter ? "h-1.5 w-1.5" : "h-2 w-2",
           selected ? "bg-muted-foreground/70" : "bg-blue-600 dark:bg-blue-400",
           unreadState === "fading" ? "opacity-0" : "opacity-100",
         )}
@@ -232,7 +237,8 @@ export function IssueRow({
         data-slot="task-row"
         data-unread={isUnread ? "true" : undefined}
         className={cn(
-          "group relative flex min-w-0 items-start gap-2 rounded-lg py-2.5 pl-4 pr-2 text-sm no-underline text-inherit sm:items-center sm:py-2",
+          "group relative flex min-w-0 items-start gap-1.5 rounded-md py-1.5 pr-2 text-(length:--text-compact) no-underline text-inherit sm:min-h-7 sm:items-center sm:py-1",
+          compactLeadingGutter ? "pl-2" : "pl-4",
           "[&_button]:relative [&_button]:z-10",
           selected ? "bg-accent/50 hover:bg-accent/50" : "hover:bg-accent/50",
           checklistCurrentStep && "bg-primary/5",
@@ -248,7 +254,7 @@ export function IssueRow({
           id={checklistRowId}
           aria-current={checklistCurrentStep ? "step" : undefined}
           onClickCapture={() => rememberIssueDetailLocationState(issuePathId, detailState)}
-          className="absolute inset-0 rounded-lg no-underline text-inherit focus-visible:z-10 focus-visible:outline-none focus-visible:ring-(length:--rad-3) focus-visible:ring-ring"
+          className="absolute inset-0 rounded-md no-underline text-inherit focus-visible:z-10 focus-visible:outline-none focus-visible:ring-(length:--rad-3) focus-visible:ring-ring"
         >
           <span className="sr-only">Open {identifier}: {issue.title}</span>
         </Link>
@@ -256,7 +262,10 @@ export function IssueRow({
         {showUnreadSlot ? (
           <span
             data-testid="issue-row-unread-slot"
-            className="absolute left-0 top-3 inline-flex h-4 w-4 items-center justify-center sm:top-1/2 sm:-translate-y-1/2"
+            className={cn(
+              "absolute left-0 top-2 inline-flex h-4 items-center justify-center sm:top-1/2 sm:-translate-y-1/2",
+              compactLeadingGutter ? "w-2" : "w-4",
+            )}
           >
             {showUnreadDot ? unreadDotButton : null}
           </span>
@@ -304,12 +313,12 @@ export function IssueRow({
           {parkedBlockerIndicator}
         </span>
 
-        <span className="flex min-w-0 flex-1 flex-col gap-1 sm:flex-row sm:items-center sm:gap-2">
+        <span className="flex min-w-0 flex-1 flex-col gap-0.5 sm:flex-row sm:items-center sm:gap-1.5">
           <span data-slot="task-row-title-cluster" className="flex min-w-0 flex-1 items-start gap-1.5 sm:items-center">
             <span
               data-slot="task-row-title"
               className={cn(
-                "min-w-0 line-clamp-2 text-sm sm:truncate sm:line-clamp-none",
+                "min-w-0 line-clamp-2 text-(length:--text-compact) leading-5 sm:truncate sm:line-clamp-none",
                 isUnread && "font-semibold",
                 titleClassName,
               )}
@@ -338,7 +347,7 @@ export function IssueRow({
           {actions ? <span data-slot="task-row-actions" className="flex shrink-0 items-center gap-1">{actions}</span> : null}
           {onArchive ? <InboxArchiveButton onArchive={onArchive} disabled={archiveDisabled} compact /> : null}
           {showIdentifier ? (
-            <span data-slot="task-row-identifier" className="w-20 shrink-0 text-right font-mono text-xs text-muted-foreground">
+            <span data-slot="task-row-identifier" className="w-20 shrink-0 text-right text-xs text-muted-foreground">
               {identifier}
             </span>
           ) : null}

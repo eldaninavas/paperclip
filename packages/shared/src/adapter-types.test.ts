@@ -26,6 +26,21 @@ describe("dynamic adapter type validation schemas", () => {
     ).toThrow();
   });
 
+  it("accepts versioned character identities and rejects malformed variants", () => {
+    const identity = "agent:v1:hexagon:mint:bright:none";
+    expect(createAgentSchema.parse({
+      name: "Character Agent",
+      adapterType: "codex_local",
+      icon: identity,
+    }).icon).toBe(identity);
+
+    expect(createAgentSchema.safeParse({
+      name: "Malformed Character",
+      adapterType: "codex_local",
+      icon: "agent:v1:hexagon:unknown:bright:none",
+    }).success).toBe(false);
+  });
+
   it("accepts an explicit managed instructions bundle for new agents", () => {
     expect(
       createAgentSchema.parse({

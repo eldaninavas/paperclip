@@ -164,7 +164,7 @@ function ConnectFlowPreview({
             lede={
               done
                 ? "The step advances straight to Review — there is no success screen."
-                : "Paperclip works with your existing subscription or API keys."
+                : "Foundation works with your existing subscription or API keys."
             }
           />
         </div>
@@ -202,7 +202,7 @@ function ConnectFlowPreview({
                   instruction="Open Claude link then come back and enter code"
                   onCancel={reset}
                 >
-                  <OnboardingLoginUrlRow url="https://claude.ai/oauth/authorize?code=true&client=paperclip&scope=all" />
+                  <OnboardingLoginUrlRow url="https://claude.ai/oauth/authorize?code=true&client=foundation&scope=all" />
                   <OnboardingLoginCodeInput
                     value={code}
                     onChange={setCode}

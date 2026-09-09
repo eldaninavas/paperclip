@@ -54,7 +54,7 @@ export function CodexLocalConfigFields({
   // The execution engine picks which binary runs on the execution host, and the
   // ACP sub-fields below name host paths. The platform-managed environment owns
   // both, so the managed-sandbox-only policy hides them the same way
-  // `runnerManaged` already does for the Paperclip Runner.
+  // `runnerManaged` already does for the Foundation Runner.
   const hideEngineChoice = runnerManaged || managedSandboxOnly === true;
   const configuredRunnerProvider = runnerManaged
     ? isCreate
@@ -161,7 +161,7 @@ export function CodexLocalConfigFields({
     ? "Fast mode will be passed through for this manual model. If Codex rejects it, turn the toggle off."
     : fastModeSupported
       ? "Fast mode consumes credits/tokens much faster than standard Codex runs."
-      : `Fast mode currently only works on ${supportedModelsLabel} or manual model IDs. Paperclip will ignore this toggle until the model is switched.`;
+      : `Fast mode currently only works on ${supportedModelsLabel} or manual model IDs. Foundation will ignore this toggle until the model is switched.`;
 
   return (
     <>
@@ -317,7 +317,7 @@ export function CodexLocalConfigFields({
           </Field>
           <Field
             label="Estimated session ceiling (USD)"
-            hint="Paperclip estimate; AWS does not provide a per-session currency hard stop."
+            hint="Foundation estimate; AWS does not provide a per-session currency hard stop."
           >
             <DraftNumberInput
               value={Number(runnerSchemaValue("maxEstimatedSessionCostUsd", 1))}
@@ -420,7 +420,7 @@ export function CodexLocalConfigFields({
       {runnerManaged && runnerPermissionCapability.configurable && (
         <Field
           label="Permission mode"
-          hint={`${runnerPermissionCapability.description} The selected mode does not widen Paperclip's workspace, network, credential, or planning boundaries.`}
+          hint={`${runnerPermissionCapability.description} The selected mode does not widen Foundation's workspace, network, credential, or planning boundaries.`}
         >
           <select
             className={inputClass}
@@ -463,7 +463,7 @@ export function CodexLocalConfigFields({
           </select>
           {runnerPermissionModeUnsupported && runnerProvider === "codex" && (
             <p className="mt-1 text-xs text-destructive" role="alert">
-              This saved Codex mode cannot start or recover a Paperclip Runner
+              This saved Codex mode cannot start or recover a Foundation Runner
               run. Select Automatic (isolated) to remediate it.
             </p>
           )}
@@ -612,7 +612,7 @@ export function CodexLocalConfigFields({
           {!managedSandboxOnly && (
             <Field
               label="ACP state directory"
-              hint="Optional ACP session state directory. Defaults to Paperclip-managed organization/agent scoped storage."
+              hint="Optional ACP session state directory. Defaults to Foundation-managed organization/agent scoped storage."
             >
               <div className="flex items-center gap-2">
                 <DraftInput

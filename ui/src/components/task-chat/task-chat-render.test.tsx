@@ -74,9 +74,9 @@ describe("Task chat thread rhythm", () => {
     const marker = host.querySelector('[data-thread-item-kind="marker"]');
     const agent = host.querySelector('[data-thread-item-kind="agent"]');
     expect(human?.className).not.toContain("mt-");
-    expect(system?.className).toContain("mt-3");
-    expect(marker?.className).toContain("mt-2");
-    expect(agent?.className).toContain("mt-3");
+    expect(system?.className).toContain("mt-2.5");
+    expect(marker?.className).toContain("mt-1.5");
+    expect(agent?.className).toContain("mt-2.5");
     expect(system?.querySelector('[role="group"]')?.getAttribute("aria-label")).toContain("System update");
     expect(marker?.querySelector('[role="separator"]')?.getAttribute("aria-label")).toBe("Plan created");
 

@@ -41,6 +41,7 @@ import {
   PopoverTrigger
 } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
+import { FoundationBrand } from "./FoundationBrand";
 import { cn } from "../lib/utils";
 import {
   extractModelName,
@@ -83,8 +84,13 @@ import {
 } from "../lib/onboarding-mission";
 import { AsciiArtAnimation } from "./AsciiArtAnimation";
 import { FrontDoor } from "./FrontDoor";
-import { PillGuy } from "./onboarding/PillGuy";
-import { SleepingZs } from "./onboarding/SleepingZs";
+import { AgentIdentityStudio } from "./AgentIconPicker";
+import {
+  AgentCharacter,
+  DEFAULT_AGENT_IDENTITY,
+  parseAgentIdentity,
+  serializeAgentIdentity,
+} from "./AgentIdentity";
 import {
   AGENT_ARC_WIZARD_STEPS,
   ONBOARDING_STEP_LABELS,
@@ -126,7 +132,7 @@ const MISSION_PROMPT_CHIPS = [
 ];
 
 // First-run onboarding stays on the proven direct adapters even when an
-// instance administrator has opted into Paperclip Runner elsewhere. The
+// instance administrator has opted into Foundation Runner elsewhere. The
 // experimental flag only exposes the runner in explicit agent configuration.
 const ONBOARDING_EXCLUDED_ADAPTER_TYPES = new Set([
   "process",
@@ -280,8 +286,8 @@ function ModelSourceMark({
 // Exported so tests write/read the exact key the component uses, instead of
 // duplicating the literal and silently drifting from it if it's ever renamed.
 export const ONBOARDING_STORAGE_KEY = "paperclip-onboarding-state";
-const DEFAULT_TASK_TITLE = "Paperclip onboarding";
-const DEFAULT_TASK_DESCRIPTION = `You are the Paperclip agent. This is your first task. Your job here is to
+const DEFAULT_TASK_TITLE = "Foundation onboarding";
+const DEFAULT_TASK_DESCRIPTION = `You are the Foundation agent. This is your first task. Your job here is to
 understand what the user wants and turn it into a concrete plan — not to
 start building yet.
 
@@ -602,6 +608,12 @@ function OnboardingWizardInner({
   // on the customer's behalf that they then have to notice and undo. It is the
   // step's only question, and its CTA gates on it.
   const [agentName, setAgentName] = useState((saved?.agentName as string) ?? "");
+  const [agentIdentity, setAgentIdentity] = useState(() => {
+    const restored = typeof saved?.agentIdentity === "string" ? saved.agentIdentity : null;
+    return parseAgentIdentity(restored)
+      ? restored!
+      : serializeAgentIdentity(DEFAULT_AGENT_IDENTITY);
+  });
   // Defaults to `general` rather than empty. The arc stopped asking for a role
   // — a customer naming their first agent is describing what it does, not
   // filing it — but the hire still needs one, and the guard below returns
@@ -944,7 +956,7 @@ function OnboardingWizardInner({
     if (!effectiveOnboardingOpen) return;
     const state = {
       step, companyName, companyGoal, missionPath, missionConfirmed,
-      q1, q2, q3, q4, agentName, agentRole, adapterType, cwd, model, command, args, url,
+      q1, q2, q3, q4, agentName, agentIdentity, agentRole, adapterType, cwd, model, command, args, url,
       // The mode, never the key: this blob is localStorage.
       credentialMode,
       createdCompanyId, createdCompanyPrefix, createdAgentId,
@@ -954,7 +966,7 @@ function OnboardingWizardInner({
     onboardingDraftStorage.write(JSON.stringify(state));
   }, [
     effectiveOnboardingOpen, step, companyName, companyGoal, missionPath, missionConfirmed,
-    q1, q2, q3, q4, agentName, agentRole, adapterType, cwd, model, command, args, url,
+    q1, q2, q3, q4, agentName, agentIdentity, agentRole, adapterType, cwd, model, command, args, url,
     credentialMode,
     createdCompanyId, createdCompanyPrefix, createdAgentId,
     createdCompanyGoalId, createdProjectId, createdIssueRef,
@@ -968,7 +980,7 @@ function OnboardingWizardInner({
     isFetching: adapterModelsFetching
   } = useQuery({
     // The wizard doesn't expose an environment selector, so models always
-    // resolve against the local Paperclip host (environmentId = null).
+    // resolve against the local Foundation host (environmentId = null).
     queryKey: createdCompanyId
       ? queryKeys.agents.adapterModels(createdCompanyId, adapterType, null)
       : ["agents", "none", "adapter-models", adapterType, null],
@@ -1930,7 +1942,7 @@ function OnboardingWizardInner({
     if (adapterType === "paperclip_runner") {
       setAdapterType("claude_local");
       setModel("");
-      setError("Paperclip Runner is not available during onboarding. Choose a legacy adapter.");
+      setError("Foundation Runner is not available during onboarding. Choose a legacy adapter.");
       return;
     }
     // Guarded at the button and the Enter path too; repeated here because this
@@ -2069,6 +2081,7 @@ function OnboardingWizardInner({
         // The name is optional; an agent that reaches here without one is
         // named for the job it was hired to do rather than left blank.
         name: agentName.trim() || AGENT_ROLE_LABELS[agentRole],
+        icon: agentIdentity,
         role: agentRole,
         adapterType,
         adapterConfig: hireAdapterConfig,
@@ -2337,6 +2350,8 @@ function OnboardingWizardInner({
                   : "w-full max-w-md px-8 py-12",
               )}
             >
+              <FoundationBrand className="mb-10 justify-center text-foreground" />
+
               {/* Full-length progress bar (brand .wsteps/.wstep) — segment N
                   filled once step ≥ N. Completed segments jump back.
                   Hidden for a run that entered on the agent arc: the arc strip
@@ -2408,21 +2423,12 @@ function OnboardingWizardInner({
                       transition={capsuleHeroMotion.transition}
                       className="flex flex-col items-center gap-2"
                     >
-                      {/* Dormant until the agent is actually hired. Review is
-                          the first step where one exists, so that is where it
-                          wakes — the arc's payoff, not a flourish along it. */}
-                      {/* `relative` is load-bearing: the sleep marks anchor
-                          to this box and travel out past its top-right
-                          corner. */}
                       <div className="relative size-(--sz-72px)">
-                        <PillGuy
-                          state={step === 5 ? "alive" : "dormant"}
+                        <AgentCharacter
+                          identity={parseAgentIdentity(agentIdentity) ?? DEFAULT_AGENT_IDENTITY}
+                          state={step === 5 ? "done" : step === 4 ? "thinking" : "idle"}
                           className="size-full"
                         />
-                        {/* Only while it is actually asleep. A still grey
-                            silhouette reads as a placeholder that failed to
-                            load rather than as something waiting its turn. */}
-                        {step < 5 && <SleepingZs />}
                       </div>
                       <AgentPreview agentName={agentName} agentRole="" />
                     </motion.div>
@@ -2441,7 +2447,7 @@ function OnboardingWizardInner({
                       // sentence restating it only pushes the fields down.
                       lede={
                         step === 3 ? undefined : step === 4 ? (
-                          <>Paperclip works with your subscription or API keys.</>
+                          <>Foundation works with your subscription or API keys.</>
                         ) : (
                           <>{agentName.trim() || "Your first agent"} is ready to work!</>
                         )
@@ -2780,14 +2786,10 @@ function OnboardingWizardInner({
                 </div>
               )}
 
-              {/* Step 3: the name, and only the name. The role picker went with
-                  the question it was asking — a customer naming their first
-                  agent is describing what it does, and the placeholder carries
-                  the range of answers that fit. Hiring uses the neutral
-                  `general` role; a specific one can be set later, where there
-                  is context to choose it in. */}
+              {/* Step 3: name the agent and create the visual identity that will
+                  represent it throughout the control plane. */}
               {step === 3 && (
-                <div className="mx-auto flex w-full flex-col gap-9">
+                <div className="mx-auto flex w-full flex-col gap-6">
                   <div className="flex flex-col gap-2">
                     <Label htmlFor="onboarding-agent-name">Agent name</Label>
                     {/*
@@ -2807,6 +2809,13 @@ function OnboardingWizardInner({
                       onChange={(e) => setAgentName(e.target.value)}
                       autoFocus
                     />
+                  </div>
+                  <div className="rounded-lg border border-border bg-(--foundation-surface-subtle) p-4">
+                    <div className="mb-2">
+                      <p className="text-sm font-medium">Choose its identity</p>
+                      <p className="text-xs text-muted-foreground">Shape, expression, and color make every agent recognizable.</p>
+                    </div>
+                    <AgentIdentityStudio value={agentIdentity} onChange={setAgentIdentity} compact />
                   </div>
                 </div>
               )}

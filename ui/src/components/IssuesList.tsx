@@ -71,7 +71,7 @@ import { Input } from "@/components/ui/input";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
 import { CircleDot, Plus, ArrowUpDown, Layers, Check, ChevronRight, List, ListTree, User, Search, CircleSlash2, ChevronsDownUp, PanelTopClose, RotateCcw, ListCollapse,
-  SquareKanban,
+  SlidersHorizontal, SquareKanban,
 } from "lucide-react";
 import {
   KanbanBoard,
@@ -1744,6 +1744,179 @@ function StreamlinedIssuesList({
         )}
         controls={(
           <>
+          {toolbarPresentation === "collection" ? (
+            <>
+              <IssueFiltersPopover
+                state={viewState}
+                onChange={updateView}
+                buttonVariant="outline"
+                activeFilterCount={activeFilterCount}
+                agents={agents}
+                creators={creatorOptions}
+                projects={projectId ? undefined : projects?.map((project) => ({ id: project.id, name: project.name }))}
+                labels={labels?.map((label) => ({ id: label.id, name: label.name, color: label.color }))}
+                currentUserId={currentUserId}
+                enableExternalObjectFilters={externalObjectsEnabled}
+                enableRoutineVisibilityFilter={enableRoutineVisibilityFilter}
+                iconOnly
+                workspaces={isolatedWorkspacesEnabled ? workspaceOptions : undefined}
+                presentation="streamlined"
+                triggerClassName="rounded-full border-border/70 bg-muted/25 shadow-none hover:bg-accent"
+              />
+
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="relative h-8 w-8 shrink-0 rounded-full border-border/70 bg-muted/25 shadow-none hover:bg-accent"
+                    title="View options"
+                    aria-label="View options"
+                  >
+                    <SlidersHorizontal className="h-3.5 w-3.5" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent align="end" className="w-72 overflow-hidden rounded-xl border-border/70 p-0 shadow-xl shadow-black/10">
+                  <div className="space-y-4 p-3">
+                    <div>
+                      <p className="mb-2 text-(length:--text-micro) font-medium uppercase tracking-(--tracking-caps) text-muted-foreground">View</p>
+                      <div className="grid grid-cols-2 gap-1 rounded-lg bg-muted/50 p-1">
+                        {([[
+                          "list", "List", List,
+                        ], [
+                          "board", "Board", SquareKanban,
+                        ]] as const).map(([mode, label, Icon]) => (
+                          <button
+                            key={mode}
+                            type="button"
+                            onClick={() => updateView({ viewMode: mode })}
+                            className={cn(
+                              "flex h-8 items-center justify-center gap-2 rounded-md text-xs text-muted-foreground transition-[background-color,color,box-shadow] duration-150 hover:text-foreground",
+                              viewState.viewMode === mode && "bg-background text-foreground shadow-sm",
+                            )}
+                          >
+                            <Icon className="h-3.5 w-3.5" />
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {viewState.viewMode === "list" ? (
+                      <>
+                        <div>
+                          <p className="mb-2 text-(length:--text-micro) font-medium uppercase tracking-(--tracking-caps) text-muted-foreground">Group by</p>
+                          <div className="flex flex-wrap gap-1">
+                            {([[
+                              "status", "Status",
+                            ], [
+                              "assignee", "Responsible",
+                            ], [
+                              "project", "Project",
+                            ], [
+                              "workspace", "Workspace",
+                            ], [
+                              "parent", "Parent",
+                            ], [
+                              "none", "None",
+                            ]] as const).map(([value, label]) => (
+                              <button
+                                key={value}
+                                type="button"
+                                onClick={() => updateView({ groupBy: value })}
+                                className={cn(
+                                  "rounded-full border border-border/70 px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
+                                  viewState.groupBy === value && "bg-accent text-foreground",
+                                )}
+                              >
+                                {label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div>
+                          <p className="mb-2 text-(length:--text-micro) font-medium uppercase tracking-(--tracking-caps) text-muted-foreground">Order by</p>
+                          <div className="flex flex-wrap gap-1">
+                            {([[
+                              "workflow", "Workflow",
+                            ], [
+                              "status", "Status",
+                            ], [
+                              "title", "Title",
+                            ], [
+                              "created", "Created",
+                            ], [
+                              "updated", "Updated",
+                            ]] as const).map(([field, label]) => (
+                              <button
+                                key={field}
+                                type="button"
+                                onClick={() => updateView({
+                                  sortField: field,
+                                  sortDir: viewState.sortField === field && viewState.sortDir === "asc" ? "desc" : "asc",
+                                })}
+                                className={cn(
+                                  "rounded-full border border-border/70 px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
+                                  viewState.sortField === field && "bg-accent text-foreground",
+                                )}
+                              >
+                                {label}{viewState.sortField === field ? (viewState.sortDir === "asc" ? " ↑" : " ↓") : ""}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between border-t border-border/70 pt-3">
+                          <button
+                            type="button"
+                            onClick={() => updateView({ nestingEnabled: !viewState.nestingEnabled })}
+                            className="flex h-8 items-center gap-2 rounded-md px-2 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                          >
+                            <ListTree className="h-3.5 w-3.5" />
+                            Nested subtasks
+                            <span className={cn("ml-1 h-2 w-2 rounded-full", viewState.nestingEnabled ? "bg-blue-500" : "bg-muted-foreground/25")} />
+                          </button>
+                          <IssueColumnPicker
+                            availableColumns={availableIssueColumns}
+                            visibleColumnSet={visibleIssueColumnSet}
+                            onToggleColumn={toggleIssueColumn}
+                            showDateGroupSeparators={viewState.showDateGroupSeparators}
+                            onToggleDateGroupSeparators={(enabled) => updateView({ showDateGroupSeparators: enabled })}
+                            onResetColumns={() => setIssueColumns(DEFAULT_INBOX_ISSUE_COLUMNS)}
+                            title="Choose visible task columns"
+                            rowPresentation={rowPresentation}
+                          />
+                        </div>
+                      </>
+                    ) : (
+                      <div className="space-y-1 border-t border-border/70 pt-3">
+                        <button
+                          type="button"
+                          className="flex h-8 w-full items-center justify-between rounded-md px-2 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                          onClick={() => updateView({ boardCardDensity: boardCompactCards ? "comfortable" : "compact" })}
+                        >
+                          Compact cards
+                          <span className={cn("h-2 w-2 rounded-full", boardCompactCards ? "bg-blue-500" : "bg-muted-foreground/25")} />
+                        </button>
+                        <button
+                          type="button"
+                          className="flex h-8 w-full items-center justify-between rounded-md px-2 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                          onClick={() => updateView({ boardColdLaneMode: boardCollapsedStatuses.length > 0 ? "expanded" : "collapsed" })}
+                        >
+                          Collapse quiet columns
+                          <span className={cn("h-2 w-2 rounded-full", boardCollapsedStatuses.length > 0 ? "bg-blue-500" : "bg-muted-foreground/25")} />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </PopoverContent>
+              </Popover>
+
+            </>
+          ) : (
+            <>
           {/* View mode toggle */}
           <div className="flex items-center border border-border rounded-md overflow-hidden mr-1" role="group" aria-label="View mode">
             <button
@@ -1968,6 +2141,8 @@ function StreamlinedIssuesList({
                 </div>
               </PopoverContent>
             </Popover>
+          )}
+            </>
           )}
           </>
         )}

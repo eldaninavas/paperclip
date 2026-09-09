@@ -59,6 +59,8 @@ import { toolAccessRoutes } from "./routes/tool-access.js";
 import { smokeLabRoutes } from "./routes/smoke-lab.js";
 import { costRoutes } from "./routes/costs.js";
 import { activityRoutes } from "./routes/activity.js";
+import { assuranceRoutes } from "./routes/assurance.js";
+import { startAssuranceReconciler } from "./services/assurance/reconciler.js";
 import { dashboardRoutes } from "./routes/dashboard.js";
 import { attentionRoutes } from "./routes/attention.js";
 import { decisionTrainingRoutes } from "./routes/decision-training.js";
@@ -132,6 +134,7 @@ const VITE_DEV_ASSET_PREFIXES = [
   "/@react-refresh",
   "/@vite/",
   "/assets/",
+  "/foundation/",
   "/node_modules/",
   "/src/",
 ];
@@ -141,6 +144,7 @@ const VITE_DEV_STATIC_PATHS = new Set([
   "/favicon-32x32.png",
   "/favicon.ico",
   "/favicon.svg",
+  "/foundation-mark.svg",
   "/site.webmanifest",
   "/sw.js",
 ]);
@@ -546,6 +550,8 @@ export async function createApp(
     ?? null;
   api.use(costRoutes(db, { pluginWorkerManager: workerManager }));
   api.use(activityRoutes(db));
+  api.use(assuranceRoutes(db, opts.storageService));
+  if (process.env.NODE_ENV !== "test") startAssuranceReconciler(db);
   api.use(dashboardRoutes(db));
   api.use(attentionRoutes(db));
   api.use(decisionTrainingRoutes(db));

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback, type ComponentType } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
   Agent,
@@ -32,7 +32,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
-import { FolderOpen, Heart, ChevronDown, X, Copy, Check, ExternalLink, Loader2, TriangleAlert, Bug } from "lucide-react";
+import { FolderOpen, Heart, ChevronDown, X, Copy, Check, ExternalLink, Loader2, TriangleAlert, Bug, Laptop, Server, KeyRound } from "lucide-react";
 import { asBoolean, asFiniteNumber, asObject, cn } from "../lib/utils";
 import { copyTextToClipboard } from "../lib/clipboard";
 import {
@@ -246,6 +246,33 @@ const MAX_TURN_CONTINUATION_MAX_ATTEMPTS_CAP = 10;
 const MAX_TURN_CONTINUATION_DEFAULT_DELAY_SEC = 1;
 const MAX_TURN_CONTINUATION_MAX_DELAY_SEC = 300;
 
+const LOCAL_ACCOUNT_ADAPTER_TYPES = [
+  "codex_local",
+  "claude_local",
+  "gemini_local",
+  "cursor",
+  "kimi_local",
+  "opencode_local",
+  "grok_local",
+  "hermes_local",
+  "pi_local",
+] as const;
+
+const REMOTE_RUNNER_ADAPTER_TYPES = [
+  "paperclip_runner",
+  "cursor_cloud",
+  "hermes_gateway",
+  "openclaw_gateway",
+] as const;
+
+type AiConnectionMode = "local" | "remote" | "advanced";
+
+function aiConnectionMode(adapterType: string): AiConnectionMode {
+  if ((LOCAL_ACCOUNT_ADAPTER_TYPES as readonly string[]).includes(adapterType)) return "local";
+  if ((REMOTE_RUNNER_ADAPTER_TYPES as readonly string[]).includes(adapterType)) return "remote";
+  return "advanced";
+}
+
 function clampInteger(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, Math.floor(value)));
 }
@@ -271,6 +298,7 @@ export function AgentConfigForm(props: AgentConfigFormProps) {
   const { selectedCompanyId } = useCompany();
   const queryClient = useQueryClient();
   const environmentVariablesEditorRef = useRef<EnvironmentVariablesEditorHandle | null>(null);
+  const [advancedConnectionOpen, setAdvancedConnectionOpen] = useState(false);
 
   // Sync disabled adapter types from server so dropdown filters them out.
   const disabledTypes = useDisabledAdaptersSync();
@@ -733,7 +761,7 @@ export function AgentConfigForm(props: AgentConfigFormProps) {
   const inheritedEnvironmentLabel = instanceDefaultEnvironment
     ? environmentDisplayLabel(instanceDefaultEnvironment)
     : managedSandboxOnly
-      ? "Paperclip Computer"
+      ? "Foundation Computer"
       : "Local";
 
   // Fetch adapter models for the effective adapter type
@@ -900,7 +928,6 @@ export function AgentConfigForm(props: AgentConfigFormProps) {
   });
   const [testActionPending, setTestActionPending] = useState(false);
   const [testActionError, setTestActionError] = useState<string | null>(null);
-  const testActionLabel = "Test";
   const isSavePending = !isCreate && Boolean(props.isSaving);
   const testEnvironmentDisabled = testActionPending || isSavePending || !selectedCompanyId;
 
@@ -1162,6 +1189,77 @@ export function AgentConfigForm(props: AgentConfigFormProps) {
     });
   }
 
+  function changeAdapterType(nextAdapterType: string) {
+    if (nextAdapterType === adapterType) return;
+    if (isCreate) {
+      // Reset adapter-specific fields when the execution provider changes.
+      const { adapterType: _adapterType, ...defaults } = defaultCreateValues;
+      const nextValues: CreateConfigValues = { ...defaults, adapterType: nextAdapterType };
+      if (nextAdapterType === "codex_local") {
+        nextValues.dangerouslyBypassSandbox =
+          DEFAULT_CODEX_LOCAL_BYPASS_APPROVALS_AND_SANDBOX;
+      } else if (nextAdapterType === "gemini_local") {
+        nextValues.model = DEFAULT_GEMINI_LOCAL_MODEL;
+      } else if (nextAdapterType === "kimi_local") {
+        nextValues.model = DEFAULT_KIMI_LOCAL_MODEL;
+      } else if (nextAdapterType === "cursor") {
+        nextValues.model = DEFAULT_CURSOR_LOCAL_MODEL;
+      } else if (nextAdapterType === "opencode_local") {
+        nextValues.model = DEFAULT_OPENCODE_LOCAL_MODEL;
+      } else if (nextAdapterType === "paperclip_runner") {
+        nextValues.model = DEFAULT_CODEX_LOCAL_MODEL;
+      }
+      set!(nextValues);
+      return;
+    }
+
+    // Blank provider-specific values so configuration from the previous
+    // runtime cannot leak into the new one.
+    setOverlay((previous) => ({
+      ...previous,
+      adapterType: nextAdapterType,
+      adapterConfig: {
+        model:
+          nextAdapterType === "gemini_local"
+            ? DEFAULT_GEMINI_LOCAL_MODEL
+            : nextAdapterType === "kimi_local"
+              ? DEFAULT_KIMI_LOCAL_MODEL
+              : nextAdapterType === "opencode_local"
+                ? DEFAULT_OPENCODE_LOCAL_MODEL
+                : nextAdapterType === "cursor"
+                  ? DEFAULT_CURSOR_LOCAL_MODEL
+                  : nextAdapterType === "paperclip_runner"
+                    ? resolvePaperclipRunnerTransitionModel(adapterType, config.model)
+                    : "",
+        effort: "",
+        modelReasoningEffort: "",
+        variant: "",
+        mode: "",
+        ...(nextAdapterType === "codex_local"
+          ? {
+              dangerouslyBypassApprovalsAndSandbox:
+                DEFAULT_CODEX_LOCAL_BYPASS_APPROVALS_AND_SANDBOX,
+            }
+          : nextAdapterType === "paperclip_runner"
+            ? {
+                provider: "codex",
+                codexPermissionMode:
+                  PAPERCLIP_RUNNER_PERMISSION_CAPABILITIES.codex.defaultMode,
+                lifecycleMode: "per_turn",
+              }
+            : {}),
+      },
+    }));
+  }
+
+  const connectionMode = aiConnectionMode(adapterType);
+  const firstAvailableLocalAdapter = LOCAL_ACCOUNT_ADAPTER_TYPES.find(
+    (type) => !adapterPickerDisabledTypes.has(type),
+  );
+  const firstAvailableRemoteAdapter = REMOTE_RUNNER_ADAPTER_TYPES.find(
+    (type) => !adapterPickerDisabledTypes.has(type) && !getAdapterDisplay(type).comingSoon,
+  );
+
   if (!isCreate && props.content === "secrets") {
     return (
       <div className={cn("relative", cards && "space-y-6")}>
@@ -1358,12 +1456,12 @@ export function AgentConfigForm(props: AgentConfigFormProps) {
         </div>
       ) : null}
 
-      {/* ---- Adapter ---- */}
+      {/* ---- AI connection ---- */}
       <div className={cn(!cards && (isCreate ? "border-t border-border" : "border-b border-border"))}>
         <div className={cn(cards ? "flex items-center justify-between mb-3" : "px-4 py-2 flex items-center justify-between gap-2")}>
           {cards
-            ? <h3 className="text-sm font-medium">Adapter</h3>
-            : <span className="text-xs font-medium text-muted-foreground">Adapter</span>
+            ? <h3 className="text-sm font-medium">Conexión de IA</h3>
+            : <span className="text-xs font-medium text-muted-foreground">Conexión de IA</span>
           }
           {showInlineAdapterTestEnvironmentButton && (
             <Button
@@ -1374,78 +1472,95 @@ export function AgentConfigForm(props: AgentConfigFormProps) {
               onClick={triggerTestEnvironment}
               disabled={testEnvironmentDisabled}
             >
-              {testActionPending ? `${testActionLabel}...` : testActionLabel}
+              {testActionPending ? "Probando…" : "Probar conexión"}
             </Button>
           )}
         </div>
         <div className={cn(cards ? "border border-border rounded-lg p-4 space-y-3" : "px-4 pb-3 space-y-3")}>
           {showAdapterTypeField && (
-            <Field label="Adapter type" hint={help.adapterType}>
-              <AdapterTypeDropdown
-                value={adapterType}
-                disabledTypes={adapterPickerDisabledTypes}
-                onChange={(t) => {
-                  if (isCreate) {
-                    // Reset all adapter-specific fields to defaults when switching adapter type
-                    const { adapterType: _at, ...defaults } = defaultCreateValues;
-                    const nextValues: CreateConfigValues = { ...defaults, adapterType: t };
-                    if (t === "codex_local") {
-                      nextValues.dangerouslyBypassSandbox =
-                        DEFAULT_CODEX_LOCAL_BYPASS_APPROVALS_AND_SANDBOX;
-                    } else if (t === "gemini_local") {
-                      nextValues.model = DEFAULT_GEMINI_LOCAL_MODEL;
-                    } else if (t === "kimi_local") {
-                      nextValues.model = DEFAULT_KIMI_LOCAL_MODEL;
-                    } else if (t === "cursor") {
-                      nextValues.model = DEFAULT_CURSOR_LOCAL_MODEL;
-                    } else if (t === "opencode_local") {
-                      nextValues.model = DEFAULT_OPENCODE_LOCAL_MODEL;
-                    } else if (t === "paperclip_runner") {
-                      nextValues.model = DEFAULT_CODEX_LOCAL_MODEL;
+            <div className="space-y-4">
+              <div className="grid gap-2 md:grid-cols-3">
+                <ConnectionModeCard
+                  icon={Laptop}
+                  title="En este equipo"
+                  description="Usa una cuenta o suscripción iniciada localmente."
+                  selected={connectionMode === "local"}
+                  disabled={!firstAvailableLocalAdapter}
+                  onClick={() => {
+                    if (connectionMode !== "local" && firstAvailableLocalAdapter) {
+                      changeAdapterType(firstAvailableLocalAdapter);
                     }
-                    set!(nextValues);
-                  } else {
-                    // Clear all adapter config and explicitly blank out model + effort/mode keys
-                    // so the old adapter's values don't bleed through via eff()
-                    setOverlay((prev) => ({
-                      ...prev,
-                      adapterType: t,
-                      adapterConfig: {
-                        model:
-                          t === "gemini_local"
-                            ? DEFAULT_GEMINI_LOCAL_MODEL
-                            : t === "kimi_local"
-                              ? DEFAULT_KIMI_LOCAL_MODEL
-                            : t === "opencode_local"
-                              ? DEFAULT_OPENCODE_LOCAL_MODEL
-                            : t === "cursor"
-                              ? DEFAULT_CURSOR_LOCAL_MODEL
-                            : t === "paperclip_runner"
-                              ? resolvePaperclipRunnerTransitionModel(adapterType, config.model)
-                              : "",
-                        effort: "",
-                        modelReasoningEffort: "",
-                        variant: "",
-                        mode: "",
-                        ...(t === "codex_local"
-                          ? {
-                              dangerouslyBypassApprovalsAndSandbox:
-                                DEFAULT_CODEX_LOCAL_BYPASS_APPROVALS_AND_SANDBOX,
-                            }
-                          : t === "paperclip_runner"
-                            ? {
-                                provider: "codex",
-                                codexPermissionMode:
-                                  PAPERCLIP_RUNNER_PERMISSION_CAPABILITIES.codex.defaultMode,
-                                lifecycleMode: "per_turn",
-                              }
-                          : {}),
-                      },
-                    }));
-                  }
-                }}
-              />
-            </Field>
+                  }}
+                />
+                <ConnectionModeCard
+                  icon={Server}
+                  title="Runner remoto"
+                  description="Ejecuta desde otro equipo autorizado."
+                  selected={connectionMode === "remote"}
+                  disabled={!firstAvailableRemoteAdapter}
+                  badge={!firstAvailableRemoteAdapter ? "Próximamente" : undefined}
+                  onClick={() => {
+                    if (connectionMode !== "remote" && firstAvailableRemoteAdapter) {
+                      changeAdapterType(firstAvailableRemoteAdapter);
+                    }
+                  }}
+                />
+                <ConnectionModeCard
+                  icon={KeyRound}
+                  title="API / servidor"
+                  description="Para ejecución continua con facturación por uso."
+                  selected={false}
+                  disabled
+                  badge="Próximamente"
+                />
+              </div>
+
+              {connectionMode === "local" ? (
+                <Field
+                  label="Proveedor"
+                  hint="Foundation usa la sesión que ya existe en este entorno; no copia tu suscripción ni tus credenciales."
+                >
+                  <AdapterTypeDropdown
+                    value={adapterType}
+                    disabledTypes={adapterPickerDisabledTypes}
+                    allowedTypes={LOCAL_ACCOUNT_ADAPTER_TYPES}
+                    showDescriptions
+                    onChange={changeAdapterType}
+                  />
+                </Field>
+              ) : connectionMode === "remote" ? (
+                <Field
+                  label="Runner"
+                  hint="El trabajo se ejecuta fuera de este servidor y vuelve a Foundation para revisión humana."
+                >
+                  <AdapterTypeDropdown
+                    value={adapterType}
+                    disabledTypes={adapterPickerDisabledTypes}
+                    allowedTypes={REMOTE_RUNNER_ADAPTER_TYPES}
+                    showDescriptions
+                    onChange={changeAdapterType}
+                  />
+                </Field>
+              ) : (
+                <div className="rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+                  Esta conexión usa una integración personalizada. Puedes cambiar su motor en la configuración avanzada.
+                </div>
+              )}
+
+              <CollapsibleSection
+                title="Configuración avanzada"
+                open={advancedConnectionOpen}
+                onToggle={() => setAdvancedConnectionOpen((open) => !open)}
+              >
+                <Field label="Motor de ejecución" hint={help.adapterType}>
+                  <AdapterTypeDropdown
+                    value={adapterType}
+                    disabledTypes={adapterPickerDisabledTypes}
+                    onChange={changeAdapterType}
+                  />
+                </Field>
+              </CollapsibleSection>
+            </div>
           )}
 
           {showInlineAdapterTestEnvironmentFeedback && (testActionError || testEnvironment.error) && (
@@ -1889,7 +2004,7 @@ export function AgentConfigForm(props: AgentConfigFormProps) {
               <div className="mt-3 flex items-start gap-2 rounded-md border border-border bg-background/60 px-3 py-2 text-xs text-foreground">
                 <Bug className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                 <span>
-                  Raw tracing is on for future runs. Paperclip keeps at most 64 MiB per run and automatically deletes it after 24 hours.
+                  Raw tracing is on for future runs. Foundation keeps at most 64 MiB per run and automatically deletes it after 24 hours.
                 </span>
               </div>
             ) : null}
@@ -3080,32 +3195,95 @@ export function AdapterEnvironmentResult({ result }: { result: AdapterEnvironmen
 
 /* ---- Internal sub-components ---- */
 
+function ConnectionModeCard({
+  icon: Icon,
+  title,
+  description,
+  selected,
+  disabled = false,
+  badge,
+  onClick,
+}: {
+  icon: ComponentType<{ className?: string }>;
+  title: string;
+  description: string;
+  selected: boolean;
+  disabled?: boolean;
+  badge?: string;
+  onClick?: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      aria-pressed={selected}
+      onClick={onClick}
+      className={cn(
+        "group min-h-28 rounded-xl border p-3 text-left transition-colors",
+        selected
+          ? "border-primary/70 bg-primary/10 ring-1 ring-inset ring-primary/20"
+          : "border-border bg-background hover:border-foreground/25 hover:bg-accent/30",
+        disabled && "cursor-not-allowed opacity-50 hover:border-border hover:bg-background",
+      )}
+    >
+      <span className="flex items-start justify-between gap-2">
+        <span className={cn(
+          "flex size-8 items-center justify-center rounded-lg border border-border bg-muted/40 text-muted-foreground",
+          selected && "border-primary/30 bg-primary/10 text-primary",
+        )}>
+          <Icon className="size-4" />
+        </span>
+        {badge ? (
+          <span className="rounded-full border border-border px-2 py-0.5 text-(length:--text-nano) text-muted-foreground">
+            {badge}
+          </span>
+        ) : null}
+      </span>
+      <span className="mt-3 block text-sm font-medium text-foreground">{title}</span>
+      <span className="mt-1 block text-xs leading-5 text-muted-foreground">{description}</span>
+    </button>
+  );
+}
+
 export function AdapterTypeDropdown({
   value,
   onChange,
   disabledTypes,
+  allowedTypes,
+  showDescriptions = false,
 }: {
   value: string;
   onChange: (type: string) => void;
   disabledTypes: Set<string>;
+  allowedTypes?: readonly string[];
+  showDescriptions?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const selectedDisplay = getAdapterDisplay(value);
   const adapterList = useMemo(
     () =>
       listAdapterOptions((type) => adapterLabels[type] ?? getAdapterLabel(type)).filter(
-        (item) => !disabledTypes.has(item.value),
+        (item) =>
+          !disabledTypes.has(item.value)
+          && (!allowedTypes || allowedTypes.includes(item.value)),
       ),
-    [disabledTypes],
+    [allowedTypes, disabledTypes],
   );
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <button className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-sm hover:bg-accent/50 transition-colors w-full justify-between">
-          <span className="inline-flex min-w-0 items-center gap-1.5">
+        <button type="button" className="inline-flex items-center gap-3 rounded-lg border border-border bg-background px-3 py-2.5 text-sm hover:bg-accent/50 transition-colors w-full justify-between">
+          <span className="inline-flex min-w-0 items-center gap-2.5">
             {value === "opencode_local" ? <OpenCodeLogoIcon className="h-3.5 w-3.5" /> : null}
-            <span className="truncate">{adapterLabels[value] ?? getAdapterLabel(value)}</span>
+            <span className="min-w-0 text-left">
+              <span className="block truncate font-medium">{adapterLabels[value] ?? getAdapterLabel(value)}</span>
+              {showDescriptions ? (
+                <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+                  {selectedDisplay.description}
+                </span>
+              ) : null}
+            </span>
             {selectedDisplay.experimental && <ExperimentalBadge />}
           </span>
           <ChevronDown className="h-3 w-3 text-muted-foreground" />
@@ -3114,10 +3292,11 @@ export function AdapterTypeDropdown({
       <PopoverContent className="w-(--radix-popover-trigger-width) p-1" align="start">
         {adapterList.map((item) => (
           <button
+            type="button"
             key={item.value}
             disabled={item.comingSoon}
             className={cn(
-              "flex items-center justify-between w-full px-2 py-1.5 text-sm rounded",
+              "flex items-center justify-between w-full px-2.5 py-2 text-sm rounded-md",
               item.comingSoon
                 ? "opacity-40 cursor-not-allowed"
                 : "hover:bg-accent/50",
@@ -3130,9 +3309,16 @@ export function AdapterTypeDropdown({
               }
             }}
           >
-            <span className="inline-flex items-center gap-1.5">
+            <span className="inline-flex min-w-0 items-center gap-2">
               {item.value === "opencode_local" ? <OpenCodeLogoIcon className="h-3.5 w-3.5" /> : null}
-              <span>{item.label}</span>
+              <span className="min-w-0 text-left">
+                <span className="block">{item.label}</span>
+                {showDescriptions ? (
+                  <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+                    {getAdapterDisplay(item.value).description}
+                  </span>
+                ) : null}
+              </span>
               {item.experimental && <ExperimentalBadge />}
             </span>
             {item.comingSoon && (

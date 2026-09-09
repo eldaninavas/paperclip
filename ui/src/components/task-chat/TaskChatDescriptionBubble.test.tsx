@@ -74,15 +74,16 @@ describe("TaskChatDescriptionBubble (PAP-375)", () => {
     });
   }
 
-  it("renders a human-created task as the blue user bubble, right-aligned, without an author header", () => {
+  it("renders a human-created task as a neutral user bubble, right-aligned, without an author header", () => {
     render(makeBrief({ createdAt: "2026-08-02T14:34:00.000Z" }));
     const bubble = container.querySelector('[data-testid="task-chat-description-bubble"]');
     expect(bubble).not.toBeNull();
     expect(bubble?.getAttribute("data-author")).toBe("human");
     expect(bubble?.className).toContain("items-end");
     expect(bubble?.querySelector('[data-testid="task-chat-agent-avatar"]')).toBeNull();
-    const body = bubble?.querySelector(".bg-\\(--liveness-blue\\)");
+    const body = bubble?.querySelector(".bg-muted");
     expect(body).not.toBeNull();
+    expect(body?.className).toContain("max-w-(--pct-72)");
     expect(body?.textContent).toContain("Ship the widget by");
     // Markdown renders (bold), not raw asterisks.
     expect(body?.querySelector("strong")?.textContent).toBe("Friday");
@@ -164,11 +165,11 @@ describe("TaskChatDescriptionBubble (PAP-375)", () => {
       });
     }
 
-    it("folds a long description at the 12-line height with a Show more expander", () => {
+    it("folds a long description into a compact brief with a Show more expander", () => {
       stubScrollHeight(900);
       render(makeBrief({ description: Array.from({ length: 40 }, (_, i) => `line ${i}`).join("\n\n") }));
       const content = container.querySelector<HTMLElement>(".fold-curtain__content");
-      expect(content?.style.maxHeight).toBe("240px");
+      expect(content?.style.maxHeight).toBe("128px");
       const toggle = [...container.querySelectorAll("button")].find((b) =>
         b.textContent?.includes("Show more"),
       );

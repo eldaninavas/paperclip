@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  BookOpen,
   Check,
   CircleSlash,
   FlaskConical,
@@ -36,7 +35,7 @@ import {
 // Public, non-secret fixture credentials for the fake OAuth provider. Kept in
 // sync with SMOKE_LAB_DEMO_EMAIL / SMOKE_LAB_DEMO_PASSWORD in
 // server/src/services/smoke-lab.ts — deterministic demo values, never real.
-const DEMO_EMAIL = "smoke@paperclip.test";
+const DEMO_EMAIL = "smoke@foundation.test";
 const DEMO_PASSWORD = "smoke-password";
 
 function formatTime(value: string | Date | null | undefined): string {
@@ -199,29 +198,12 @@ export function SmokeLabTab({ companyId }: { companyId: string }) {
           <FlaskConical className="h-5 w-5 text-muted-foreground" />
           <h1 className="text-xl font-bold text-foreground">Smoke Lab</h1>
           <Badge variant="outline">Experimental</Badge>
-          <a
-            href="https://github.com/paperclipai/paperclip/blob/master/doc/connections/SMOKE-LAB-TUTORIAL.md"
-            target="_blank"
-            rel="noreferrer"
-            className="ml-auto inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
-          >
-            <BookOpen className="h-4 w-4" /> Hands-on tutorial
-          </a>
         </div>
         <p className="mt-1.5 max-w-3xl text-sm text-muted-foreground">
           Exercise every integration path (P1–P7) end-to-end against deterministic local fixtures —
           a fake OAuth provider and loopback MCP servers. Nothing here touches a real vendor or a
           real credential. Start the services, install the fixture apps, then drive the governed
-          lifecycle from a browser smoke run. New here? Follow the{" "}
-          <a
-            href="https://github.com/paperclipai/paperclip/blob/master/doc/connections/SMOKE-LAB-TUTORIAL.md"
-            target="_blank"
-            rel="noreferrer"
-            className="font-medium text-primary hover:underline"
-          >
-            hands-on tutorial
-          </a>
-          .
+          lifecycle from a browser smoke run.
         </p>
       </header>
 

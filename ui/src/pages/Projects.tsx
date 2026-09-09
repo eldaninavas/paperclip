@@ -1,19 +1,20 @@
 import { useEffect, useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Project } from "@paperclipai/shared";
 import { projectsApi } from "../api/projects";
 import { useCompany } from "../context/CompanyContext";
 import { useDialogActions } from "../context/DialogContext";
 import { useBreadcrumbs } from "../context/BreadcrumbContext";
+import { useToastActions } from "../context/ToastContext";
 import { queryKeys } from "../lib/queryKeys";
 import { EntityRow } from "../components/EntityRow";
-import { ProjectTile } from "../components/ProjectTile";
+import { ProjectTilePicker } from "../components/ProjectTilePicker";
 import { StatusBadge } from "../components/StatusBadge";
 import { MembershipAction } from "../components/MembershipAction";
 import { StarToggle } from "../components/StarToggle";
 import { EmptyState } from "../components/EmptyState";
 import { PageSkeleton } from "../components/PageSkeleton";
-import { formatDate, formatNumber, formatProjectBudget, projectUrl } from "../lib/utils";
+import { cn, formatDate, formatNumber, formatProjectBudget, projectUrl } from "../lib/utils";
 import {
   isStarred,
   resourceMembershipState,
@@ -22,7 +23,7 @@ import {
 } from "../hooks/useResourceMemberships";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { ArrowUpDown, Check, Hexagon, Plus } from "lucide-react";
+import { ArrowUpDown, Box, Check, Plus } from "lucide-react";
 import { Card } from "@/components/ui/card";
 
 type ProjectSortField = "name" | "updated" | "created" | "targetDate";
@@ -80,6 +81,8 @@ export function Projects() {
   const { selectedCompanyId } = useCompany();
   const { openNewProject } = useDialogActions();
   const { setBreadcrumbs } = useBreadcrumbs();
+  const { pushToast } = useToastActions();
+  const queryClient = useQueryClient();
   const [sortField, setSortField] = useState<ProjectSortField>("name");
   const [sortDir, setSortDir] = useState<ProjectSortDir>("asc");
 
@@ -94,6 +97,28 @@ export function Projects() {
   });
   const membershipsQuery = useResourceMemberships(selectedCompanyId);
   const membershipMutation = useResourceMembershipMutation(selectedCompanyId);
+  const identityMutation = useMutation({
+    mutationFn: ({ projectId, patch }: { projectId: string; patch: { icon?: string; color?: string | null } }) =>
+      projectsApi.update(projectId, patch, selectedCompanyId!),
+    onMutate: async ({ projectId, patch }) => {
+      const key = queryKeys.projects.list(selectedCompanyId!);
+      await queryClient.cancelQueries({ queryKey: key });
+      const previous = queryClient.getQueryData<Project[]>(key);
+      queryClient.setQueryData<Project[]>(key, (current) =>
+        current?.map((project) => project.id === projectId ? { ...project, ...patch } : project),
+      );
+      return { previous, key };
+    },
+    onError: (_error, _variables, context) => {
+      if (context?.previous) queryClient.setQueryData(context.key, context.previous);
+      pushToast({ title: "Could not update the project identity", tone: "error" });
+    },
+    onSettled: () => {
+      if (selectedCompanyId) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.projects.all(selectedCompanyId) });
+      }
+    },
+  });
   const projects = useMemo(
     () => allProjects ?? [],
     [allProjects],
@@ -119,7 +144,7 @@ export function Projects() {
   const sortLabel = PROJECT_SORT_OPTIONS.find((option) => option.field === sortField)?.label ?? "Name";
 
   if (!selectedCompanyId) {
-    return <EmptyState icon={Hexagon} message="Select an organization to view projects." />;
+    return <EmptyState icon={Box} message="Select an organization to view projects." />;
   }
 
   if (isLoading) {
@@ -178,7 +203,7 @@ export function Projects() {
 
       {!isLoading && projects.length === 0 && (
         <EmptyState
-          icon={Hexagon}
+          icon={Box}
           message="No projects yet."
           action="Add Project"
           onAction={openNewProject}
@@ -186,7 +211,7 @@ export function Projects() {
       )}
 
       {projects.length > 0 && (
-        <div className="space-y-6">
+        <div className="space-y-4">
           {([
             ["My Projects", groupedProjects.mine],
             ["Other Projects", groupedProjects.other],
@@ -194,13 +219,15 @@ export function Projects() {
             if (sectionProjects.length === 0) return null;
 
             return (
-              <section key={label} className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-sm font-medium">{label}</h2>
-                  <span className="text-xs text-muted-foreground">
-                    {sectionProjects.length} project{sectionProjects.length === 1 ? "" : "s"}
-                  </span>
-                </div>
+              <section key={label} className={cn(label === "My Projects" ? "space-y-0" : "space-y-2 pt-1")}>
+                {label === "Other Projects" ? (
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-xs font-medium text-muted-foreground">Other projects</h2>
+                    <span className="text-(length:--text-micro) text-muted-foreground/70">
+                      {sectionProjects.length}
+                    </span>
+                  </div>
+                ) : null}
                 <Card className="block py-0 overflow-hidden divide-y divide-border">
                   {sectionProjects.map((project) => {
                     const state = resourceMembershipState(membershipsQuery.data, "project", project.id);
@@ -213,7 +240,16 @@ export function Projects() {
                     return (
                       <EntityRow
                         key={project.id}
-                        leading={<ProjectTile color={project.color ?? null} icon={project.icon ?? null} size="sm" />}
+                        leading={(
+                          <ProjectTilePicker
+                            color={project.color ?? null}
+                            icon={project.icon ?? null}
+                            size="sm"
+                            stopNavigation
+                            onSelectIcon={(icon) => identityMutation.mutate({ projectId: project.id, patch: { icon } })}
+                            onSelectColor={(color) => identityMutation.mutate({ projectId: project.id, patch: { color } })}
+                          />
+                        )}
                         title={project.name}
                         subtitle={project.description ?? undefined}
                         reserveSubtitleSpace

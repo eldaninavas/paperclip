@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   Check,
-  ChevronsUpDown,
+  ChevronDown,
   GripVertical,
   LogOut,
   Plus,
@@ -51,7 +51,7 @@ interface SidebarCompanyMenuProps {
   onOpenChange?: (open: boolean) => void;
 }
 
-const WORKSPACE_ICON_CLASS = "size-5 shrink-0 rounded-md text-(length:--text-micro)";
+const WORKSPACE_ICON_CLASS = "size-4.5 shrink-0 rounded text-(length:--text-nano)";
 const WORKSPACE_BADGE_CLASS =
   "shrink-0 rounded bg-muted px-1.5 py-0.5 font-mono text-(length:--text-nano) text-muted-foreground";
 
@@ -230,7 +230,7 @@ export function SidebarCompanyMenu({ open: controlledOpen, onOpenChange }: Sideb
     userId: currentUserId,
   });
 
-  // In Paperclip Cloud the switcher lists the signed-in user's stacks
+  // In Foundation Cloud the switcher lists the signed-in user's stacks
   // (organizations) instead of the instance's companies: a cloud instance holds
   // exactly one company, and switching means leaving this tenant host entirely.
   const cloud = useCloudInstance();
@@ -343,16 +343,14 @@ export function SidebarCompanyMenu({ open: controlledOpen, onOpenChange }: Sideb
       <DropdownMenuTrigger asChild>
         <Button
           variant="ghost"
-          // The nav icon column sits at nav px-3 + item mx-2 + item px-2.
-          // Match that inset with wrapper px-3 + trigger px-4. Override the
-          // Button's direct-SVG padding too so the expanded chevron cannot pull
-          // the avatar four pixels left of the nav icons.
+          // The switcher now owns the product header, so it stays compact and
+          // leaves room for the adjacent search and create actions.
           // `min-w-0` on every link of the flex chain (button → label row → label)
           // is what lets the name truncate: a flex item's default `min-width:auto`
           // floors it at its content width, so without it a long name widens the
           // trigger past the sidebar and pushes the chevron out of bounds. Company
           // names were short in practice; cloud stack names are user-chosen.
-          className="h-9 min-w-0 flex-1 justify-start gap-2 px-4 text-left hover:bg-background hover:text-foreground has-[>svg]:px-4 dark:hover:bg-background"
+          className="h-8 min-w-0 flex-1 justify-start gap-2 px-2 text-left transition-colors duration-(--motion-duration-exit) hover:bg-(--foundation-sidebar-hover) hover:text-foreground has-[>svg]:px-2 dark:hover:bg-(--foundation-sidebar-hover)"
           aria-label={
             currentName
               ? `Open ${currentName} ${switcherNoun} switcher`
@@ -369,7 +367,7 @@ export function SidebarCompanyMenu({ open: controlledOpen, onOpenChange }: Sideb
                 truncates stays hover-recoverable via title. */}
             <span
               className={cn(
-                "min-w-0 truncate text-sm font-bold text-foreground",
+                "min-w-0 truncate text-(length:--text-compact) font-medium text-foreground",
                 rail && SIDEBAR_RAIL_HIDDEN_LABEL,
               )}
               title={currentName ?? undefined}
@@ -377,7 +375,7 @@ export function SidebarCompanyMenu({ open: controlledOpen, onOpenChange }: Sideb
               {currentName ?? `Select ${switcherNoun}`}
             </span>
           </span>
-          {!rail && <ChevronsUpDown className="size-3.5 shrink-0 text-muted-foreground" />}
+          {!rail && <ChevronDown className="size-3.5 shrink-0 text-muted-foreground/70" />}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" sideOffset={8} className="w-64 p-1">

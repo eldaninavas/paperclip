@@ -230,7 +230,7 @@ export function SidebarCompanyMenu({ open: controlledOpen, onOpenChange }: Sideb
     userId: currentUserId,
   });
 
-  // In Paperclip Cloud the switcher lists the signed-in user's stacks
+  // In Foundation Cloud the switcher lists the signed-in user's stacks
   // (organizations) instead of the instance's companies: a cloud instance holds
   // exactly one company, and switching means leaving this tenant host entirely.
   const cloud = useCloudInstance();
@@ -238,7 +238,7 @@ export function SidebarCompanyMenu({ open: controlledOpen, onOpenChange }: Sideb
   // The invite shortcut points at the company Invites surface, so an operator
   // that hides that surface via PAPERCLIP_HIDDEN_SETTINGS (company.invites or
   // company.members) hides this shortcut too. This is the per-deployment knob
-  // Paperclip Cloud uses to drop the shortcut on its managed stacks while
+  // Foundation Cloud uses to drop the shortcut on its managed stacks while
   // other hosters keep it; the streamlined menu already honors it, this shell
   // was the gap. Until the health response resolves the hidden set is unknown
   // — keep the shortcut out rather than flash it.

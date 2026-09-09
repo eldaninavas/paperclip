@@ -139,9 +139,8 @@ export type AgentIconName = (typeof AGENT_ICON_NAMES)[number];
 /**
  * Curated Lucide icon set for projects (PAP-68 part 3).
  *
- * The first entry, `"folder"`, is the default for any project without an
- * explicit icon. The remaining entries reuse much of the agent icon set plus a
- * handful of folder/structure icons that read well at small tile sizes.
+ * Curated symbols available for project identities. Projects without an
+ * explicit identity render as a cube in the UI.
  */
 export const PROJECT_ICON_NAMES = [
   "folder",
@@ -185,6 +184,18 @@ export const PROJECT_ICON_NAMES = [
   "hexagon",
 ] as const;
 export type ProjectIconName = (typeof PROJECT_ICON_NAMES)[number];
+
+export const PROJECT_EMOJI_PREFIX = "emoji:";
+
+export function isProjectEmojiIcon(value: string): boolean {
+  if (!value.startsWith(PROJECT_EMOJI_PREFIX)) return false;
+  const emoji = value.slice(PROJECT_EMOJI_PREFIX.length);
+  return emoji.length > 0 && emoji.length <= 32 && /\p{Extended_Pictographic}/u.test(emoji);
+}
+
+export function isProjectIconValue(value: string): boolean {
+  return PROJECT_ICON_NAMES.includes(value as ProjectIconName) || isProjectEmojiIcon(value);
+}
 
 export const ISSUE_STATUSES = [
   "backlog",
@@ -689,6 +700,8 @@ export const APPROVAL_TYPES = [
   "approve_ceo_strategy",
   "budget_override_required",
   "request_board_approval",
+  "assurance_task_validation",
+  "assurance_dossier_manifest",
 ] as const;
 export type ApprovalType = (typeof APPROVAL_TYPES)[number];
 

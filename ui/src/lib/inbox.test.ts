@@ -19,6 +19,7 @@ import {
   buildInboxDismissedAtByKey,
   computeInboxBadgeData,
   filterInboxIssues,
+  filterInboxApprovalsForDelivery,
   getArchivedInboxSearchIssues,
   getAvailableInboxIssueColumns,
   getInboxWorkItemKey,
@@ -28,6 +29,7 @@ import {
   getInboxSearchSupplementIssues,
   getRecentTouchedIssues,
   getUnreadTouchedIssues,
+  groupInboxActivityByIssue,
   groupInboxWorkItems,
   isInboxEntityDismissed,
   isMineInboxTab,
@@ -53,6 +55,7 @@ import {
   shouldShowCompanyAlerts,
   shouldResetInboxWorkspaceGrouping,
   shouldShowInboxSection,
+  shouldSurfaceInboxApprovalForIssueState,
   type InboxWorkItem,
 } from "./inbox";
 
@@ -367,6 +370,32 @@ describe("inbox helpers", () => {
     });
   });
 
+  it("does not count read approvals, failed runs, or join requests in the badge", () => {
+    const approval = { ...makeApproval("pending"), requestedByUserId: "user-1" };
+    const run = makeRun("run-read", "failed", "2026-03-11T01:00:00.000Z");
+    const joinRequest = makeJoinRequest("join-read");
+    const result = computeInboxBadgeData({
+      approvals: [approval],
+      joinRequests: [joinRequest],
+      dashboard,
+      heartbeatRuns: [run],
+      mineIssues: [],
+      dismissedAlerts: new Set<string>(),
+      dismissedAtByKey: new Map<string, number>(),
+      currentUserId: "user-1",
+      readItems: new Set([
+        `approval:${approval.id}`,
+        `run:${run.id}`,
+        `join:${joinRequest.id}`,
+      ]),
+    });
+
+    expect(result.approvals).toBe(0);
+    expect(result.failedRuns).toBe(0);
+    expect(result.joinRequests).toBe(0);
+    expect(result.inbox).toBe(0);
+  });
+
   it("excludes read mine issues from the inbox badge count", () => {
     const result = computeInboxBadgeData({
       approvals: [],
@@ -643,6 +672,82 @@ describe("inbox helpers", () => {
     ).toEqual([
       `workspace:default:${getInboxWorkItemKey({ kind: "issue", timestamp: 2, issue: parentIssue })}`,
     ]);
+  });
+
+  it("groups approvals and failed runs under their task row", () => {
+    const issue = makeIssue("task-1", true);
+    const approval = makeApprovalWithTimestamps(
+      "approval-task-1",
+      "pending",
+      "2026-03-11T03:00:00.000Z",
+    );
+    approval.payload = { issueId: issue.id };
+    const run = makeRun("run-task-1", "failed", "2026-03-11T04:00:00.000Z");
+    run.contextSnapshot = { issueId: issue.id };
+    const joinRequest = makeJoinRequest("join-standalone");
+    const section = buildGroupedInboxSections(
+      getInboxWorkItems({ issues: [issue], approvals: [approval], failedRuns: [run], joinRequests: [joinRequest] }),
+      "none",
+      {},
+    )[0]!;
+
+    const grouped = groupInboxActivityByIssue([section], new Map([[issue.id, issue]]));
+
+    expect(grouped.sections[0]?.displayItems.map(getInboxWorkItemKey)).toEqual([
+      `issue:${issue.id}`,
+      `join:${joinRequest.id}`,
+    ]);
+    expect(grouped.activityItemsByIssueId.get(issue.id)?.map(getInboxWorkItemKey)).toEqual([
+      `run:${run.id}`,
+      `approval:${approval.id}`,
+    ]);
+  });
+
+  it("keeps unlinked activity as a normal inbox row", () => {
+    const approval = makeApprovalWithTimestamps(
+      "approval-unlinked",
+      "pending",
+      "2026-03-11T03:00:00.000Z",
+    );
+    const section = buildGroupedInboxSections(
+      getInboxWorkItems({ issues: [], approvals: [approval] }),
+      "none",
+      {},
+    )[0]!;
+
+    const grouped = groupInboxActivityByIssue([section], new Map());
+
+    expect(grouped.sections[0]?.displayItems.map(getInboxWorkItemKey)).toEqual([
+      `approval:${approval.id}`,
+    ]);
+    expect(grouped.activityItemsByIssueId.size).toBe(0);
+  });
+
+  it("surfaces Assurance approval only after its task is done", () => {
+    const issue = makeIssue("task-awaiting-delivery", true);
+    issue.status = "in_progress";
+    const approval = makeApprovalWithTimestamps(
+      "approval-task-awaiting-delivery",
+      "pending",
+      "2026-03-11T03:00:00.000Z",
+    );
+    approval.type = "assurance_task_validation";
+    approval.payload = { issueId: issue.id };
+
+    expect(shouldSurfaceInboxApprovalForIssueState(approval, new Map([[issue.id, issue]]))).toBe(false);
+    issue.status = "done";
+    expect(shouldSurfaceInboxApprovalForIssueState(approval, new Map([[issue.id, issue]]))).toBe(true);
+
+    const latestApproval = {
+      ...approval,
+      id: "approval-task-awaiting-delivery-latest",
+      // API responses arrive as ISO strings even though the shared client type is hydrated as Date.
+      updatedAt: "2026-03-11T04:00:00.000Z" as unknown as Date,
+    };
+    expect(filterInboxApprovalsForDelivery(
+      [approval, latestApproval],
+      new Map([[issue.id, issue]]),
+    ).map((row) => row.id)).toEqual([latestApproval.id]);
   });
 
   it("keeps nested grandchild issues visible in keyboard navigation", () => {

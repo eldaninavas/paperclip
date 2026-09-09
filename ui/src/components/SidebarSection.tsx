@@ -74,15 +74,13 @@ function SidebarSectionHeader({
   const hasMenu = Boolean(
     menu && ((menu.actions?.length ?? 0) > 0 || (menu.radioChoices?.length ?? 0) > 0),
   );
-  const labelClassName = "text-(length:--text-nano) font-medium uppercase tracking-widest font-mono text-muted-foreground/60";
+  const labelClassName = "text-(length:--text-micro) font-medium text-muted-foreground/85";
   const headerControlVisibilityClassName = isMobile
     ? "opacity-100"
     : "opacity-0 group-hover/sidebar-section:opacity-100 group-focus-within/sidebar-section:opacity-100";
   const caretClassName = cn(
-    "h-3 w-3 shrink-0 text-muted-foreground/60 transition-all",
-    headerControlVisibilityClassName,
+    "size-3 shrink-0 text-muted-foreground/85 opacity-100 transition-[transform,color] duration-(--motion-duration-exit) ease-(--motion-ease-out)",
     collapsible?.open && "rotate-90",
-    menuOpen && "opacity-100",
   );
   const actionClassName = cn(
     "h-5 w-5 shrink-0 text-muted-foreground/60 transition-opacity hover:text-foreground data-[state=open]:opacity-100",
@@ -152,21 +150,9 @@ function SidebarSectionHeader({
   );
 
   return (
-    <div className="group/sidebar-section px-3 py-1.5 pointer-coarse:py-1">
-      <div className="relative flex min-h-6 min-w-0 items-center gap-1">
-        {collapsible ? (
-          <CollapsibleTrigger asChild>
-            <button
-              type="button"
-              data-slot="icon-button"
-              className="absolute -left-4 flex h-5 w-5 items-center justify-center rounded-sm outline-none transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
-              aria-label={collapsible.open ? `Collapse ${label}` : `Expand ${label}`}
-            >
-              <ChevronRight className={caretClassName} aria-hidden="true" />
-            </button>
-          </CollapsibleTrigger>
-        ) : null}
-        {headingControl}
+    <div className="group/sidebar-section px-2.5 py-1 pointer-coarse:py-1">
+      <div className="flex min-h-5 min-w-0 items-center gap-1">
+        <div className="min-w-0 flex-1">{headingControl}</div>
         {headerAction && HeaderActionIcon ? (
           <Button
             variant="ghost"
@@ -177,6 +163,18 @@ function SidebarSectionHeader({
           >
             <HeaderActionIcon className="h-3.5 w-3.5" />
           </Button>
+        ) : null}
+        {collapsible ? (
+          <CollapsibleTrigger asChild>
+            <button
+              type="button"
+              data-slot="icon-button"
+              className="ml-auto flex size-5 shrink-0 items-center justify-center rounded-sm text-muted-foreground outline-none transition-colors duration-(--motion-duration-exit) hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
+              aria-label={collapsible.open ? `Collapse ${label}` : `Expand ${label}`}
+            >
+              <ChevronRight className={caretClassName} aria-hidden="true" />
+            </button>
+          </CollapsibleTrigger>
         ) : null}
       </div>
     </div>
@@ -207,8 +205,8 @@ export function SidebarSection({
   if (rail) {
     return (
       <div>
-        <div className="px-3 py-1.5 pointer-coarse:py-1">
-          <div className="flex min-h-6 items-center">
+        <div className="px-2.5 py-1 pointer-coarse:py-1">
+          <div className="flex min-h-5 items-center">
             <span className="sr-only">{label}</span>
             <div className="h-px w-full bg-border/60" aria-hidden="true" />
           </div>

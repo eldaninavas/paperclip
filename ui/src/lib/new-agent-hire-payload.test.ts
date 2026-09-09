@@ -4,6 +4,18 @@ import { buildNewAgentHirePayload } from "./new-agent-hire-payload";
 import { defaultCreateValues } from "../components/agent-config-defaults";
 
 describe("buildNewAgentHirePayload", () => {
+  it("persists the identity selected during agent creation", () => {
+    const payload = buildNewAgentHirePayload({
+      name: "  Scout  ",
+      icon: "rocket",
+      effectiveRole: "general",
+      configValues: defaultCreateValues,
+      adapterConfig: {},
+    });
+
+    expect(payload).toMatchObject({ name: "Scout", icon: "rocket" });
+  });
+
   it("persists the selected default environment id", () => {
     expect(
       buildNewAgentHirePayload({

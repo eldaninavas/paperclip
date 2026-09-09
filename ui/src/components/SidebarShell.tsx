@@ -12,18 +12,14 @@ import {
 } from "react";
 import { cn } from "@/lib/utils";
 
-const DEFAULT_SIDEBAR_WIDTH = 240;
-const MIN_SIDEBAR_WIDTH = 208;
+const DEFAULT_SIDEBAR_WIDTH = 224;
+const MIN_SIDEBAR_WIDTH = 192;
 const MAX_SIDEBAR_WIDTH = 420;
 const SIDEBAR_WIDTH_STEP = 16;
 
-// Collapsed icon rail. Width is chosen so the icon is *centered* in the rail,
-// which keeps the active/hover highlight symmetric around it (PAP-10676):
-// the icon's left edge sits at nav px-3 (12) + item px-3 (12) = 24px, so a
-// matching 24px trailing margin (12 item px-3 + 12 nav px-3) yields
-// 24 + 16 (icon) + 24 = 64. The icon's left edge is unchanged from the expanded
-// layout, so icons stay pixel-identical across states.
-export const SIDEBAR_RAIL_WIDTH = 64;
+// Keep the collapsed rail on the same compact grid as the expanded sidebar.
+// 8px nav inset + 10px item inset + 14px icon + 20px trailing space = 52px.
+export const SIDEBAR_RAIL_WIDTH = 52;
 
 function clampSidebarWidth(width: number) {
   return Math.min(MAX_SIDEBAR_WIDTH, Math.max(MIN_SIDEBAR_WIDTH, width));
@@ -94,7 +90,7 @@ export function SidebarShell({
   collapsed = false,
   peeking = false,
   resizable = false,
-  storageKey = "paperclip.sidebar.width",
+  storageKey = "foundation.sidebar.width.v2",
   className,
   onPanelMouseEnter,
   onPanelMouseLeave,

@@ -126,6 +126,10 @@ vi.mock("./ToastViewport", () => ({
   ToastViewport: () => null,
 }));
 
+vi.mock("../pages/NotFound", () => ({
+  NotFoundPage: () => <div>Not found</div>,
+}));
+
 vi.mock("./MobileBottomNav", () => ({
   MobileBottomNav: () => null,
 }));
@@ -325,6 +329,30 @@ describe("Layout", () => {
     });
   });
 
+  it("repairs a stale organization prefix while preserving the current section", async () => {
+    currentPathname = "/CTX/artifacts";
+    mockCompanyState.companies = [{ id: "company-fen", issuePrefix: "FEN", name: "Feniks" }];
+    mockCompanyState.selectedCompany = { id: "company-fen", issuePrefix: "FEN", name: "Feniks" };
+    mockCompanyState.selectedCompanyId = "company-fen";
+    const root = createRoot(container);
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+    await act(async () => {
+      root.render(
+        <QueryClientProvider client={queryClient}>
+          <Layout />
+        </QueryClientProvider>,
+      );
+    });
+    await flushReact();
+
+    expect(mockNavigate).toHaveBeenCalledWith("/FEN/artifacts", { replace: true });
+
+    await act(async () => {
+      root.unmount();
+    });
+  });
+
   it("scopes the Streamlined task-detail surface while preserving balanced horizontal gutters", async () => {
     currentPathname = "/PAP/issues/PAP-1";
     mockInstanceSettingsApi.getExperimental.mockResolvedValue({
@@ -347,8 +375,9 @@ describe("Layout", () => {
     expect(container.querySelector(".streamlined-task-detail-surface")).not.toBeNull();
     expect(container.querySelector("#main-content")?.classList.contains("pt-0")).toBe(true);
     expect(container.querySelector("#main-content")?.classList.contains("md:pt-0")).toBe(true);
-    expect(container.querySelector("#main-content")?.classList.contains("p-4")).toBe(true);
-    expect(container.querySelector("#main-content")?.classList.contains("md:p-6")).toBe(true);
+    expect(container.querySelector("#main-content")?.classList.contains("px-(--foundation-page-gutter)")).toBe(true);
+    expect(container.querySelector("#main-content")?.classList.contains("md:px-(--foundation-page-gutter-wide)")).toBe(true);
+    expect(container.querySelector("#main-content")?.classList.contains("py-3")).toBe(true);
     expect(container.querySelector("#main-content")?.classList.contains("pr-0")).toBe(false);
     expect(container.querySelector("#main-content")?.classList.contains("md:pr-0")).toBe(false);
 
@@ -1217,7 +1246,7 @@ describe("Layout", () => {
     const { root, rootEl } = await renderLayoutRoot();
 
     expect(rootEl.tagName).toBe("DIV");
-    expect(rootEl.className).toContain("bg-background");
+    expect(rootEl.className).toContain("bg-(--foundation-canvas)");
     // The mobile root must clip horizontal overflow to prevent a stray wide
     // descendant from making the whole viewport scroll sideways. clip (not
     // hidden) keeps overflow-y visible so body scroll keeps working.
@@ -1233,7 +1262,7 @@ describe("Layout", () => {
     mockSidebarState.isMobile = false;
     const { root, rootEl } = await renderLayoutRoot();
 
-    expect(rootEl.className).toContain("bg-background");
+    expect(rootEl.className).toContain("bg-(--foundation-canvas)");
     expect(rootEl.classList.contains("overflow-clip")).toBe(true);
 
     await act(async () => {

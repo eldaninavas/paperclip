@@ -283,15 +283,22 @@ export function Layout() {
       const fallback = (selectedCompanyId ? companies.find((company) => company.id === selectedCompanyId) : null)
         ?? companies[0]
         ?? null;
-      if (fallback && selectedCompanyId !== fallback.id) {
+      if (!fallback) return;
+      if (selectedCompanyId !== fallback.id) {
         setSelectedCompanyId(fallback.id, { source: "route_sync" });
       }
+      // A deleted/renamed organization can leave a restored tab or bookmark
+      // carrying its old prefix. Keep the current section, but repair the
+      // tenant segment immediately so the active organization and URL cannot
+      // disagree (for example `/CTX/artifacts` while FEN is selected).
+      const suffix = location.pathname.replace(/^\/[^/]+/, "");
+      navigate(`/${fallback.issuePrefix}${suffix}${location.search}${location.hash}`, { replace: true });
       return;
     }
 
     if (companyPrefix !== matchedCompany.issuePrefix) {
       const suffix = location.pathname.replace(/^\/[^/]+/, "");
-      navigate(`/${matchedCompany.issuePrefix}${suffix}${location.search}`, { replace: true });
+      navigate(`/${matchedCompany.issuePrefix}${suffix}${location.search}${location.hash}`, { replace: true });
       return;
     }
 
@@ -332,6 +339,7 @@ export function Layout() {
     matchedCompany,
     location.pathname,
     location.search,
+    location.hash,
     navigate,
     pushToast,
     selectionSource,
@@ -611,11 +619,30 @@ export function Layout() {
     }
   }, [location.key, location.pathname, location.state, navigationType]);
 
+  // Route changes should feel connected, not like a full page repaint. Keep
+  // the movement below the threshold where text looks as if it is sliding;
+  // the 2px settle and short fade are enough to preserve spatial continuity.
+  useEffect(() => {
+    const main = mainContentRef.current;
+    if (!main || typeof main.animate !== "function") return;
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+
+    const transition = main.animate(
+      [
+        { opacity: 0.94, transform: "translateY(2px)" },
+        { opacity: 1, transform: "translateY(0)" },
+      ],
+      { duration: 130, easing: "cubic-bezier(0.16, 1, 0.3, 1)" },
+    );
+
+    return () => transition.cancel();
+  }, [location.pathname]);
+
   return (
     <GeneralSettingsProvider value={{ keyboardShortcutsEnabled }}>
       <div
       className={cn(
-        "bg-background text-foreground pt-(--sz-safe-top)",
+        "bg-(--foundation-canvas) text-foreground pt-(--sz-safe-top)",
         // overflow-x-clip on mobile keeps a stray wide descendant from making the
         // whole viewport scroll horizontally. clip (not hidden) leaves overflow-y
         // computed as visible, so native body scroll + the sticky breadcrumb keep
@@ -693,7 +720,14 @@ export function Layout() {
           </SecondarySidebar>
         ) : null}
 
-        <div className={cn("flex min-w-0 flex-col", isMobile ? "w-full" : "h-full flex-1")}>
+        <div
+          className={cn(
+            "flex min-w-0 flex-col",
+            isMobile
+              ? "w-full bg-background"
+              : "m-(--foundation-shell-inset) ml-0 min-h-0 flex-1 overflow-hidden rounded-(--foundation-shell-radius) border border-border/70 bg-background",
+          )}
+        >
           <div
             className={cn(
               !isMobile && useStreamlinedTaskDetailShell && "hidden",
@@ -743,7 +777,7 @@ export function Layout() {
                   : undefined
               }
               className={cn(
-                "flex-1 p-4 outline-none md:p-6",
+                "flex-1 px-(--foundation-page-gutter) py-3 outline-none md:px-(--foundation-page-gutter-wide) md:py-3",
                 // The task thread owns its scrollable top spacing. Leaving the
                 // page shell's top padding in place creates a stationary dark
                 // strip below the breadcrumb while messages scroll behind it.

@@ -54,6 +54,8 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+  --color-foundation-sidebar-foreground: var(--foundation-sidebar-foreground);
+  --color-foundation-sidebar-muted: var(--foundation-sidebar-muted);
   /* Multiplicative radius ladder (modern shadcn/Tailwind v4 mapping):
      sm/md/lg/xl/2xl/3xl/4xl = 0.6/0.8/1.0/1.4/1.8/2.2/2.6 x the single
      --radius knob (base anchor 0.5rem = 8px; rounded-lg IS the anchor).
@@ -72,25 +74,25 @@
 :root {
   color-scheme: light;
   --radius: 0.5rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
+  --background: #fbfbfc;
+  --foreground: #25262a;
+  --card: #ffffff;
+  --card-foreground: #25262a;
+  --popover: #ffffff;
+  --popover-foreground: #25262a;
   --primary: oklch(0.205 0 0);
   --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
+  --secondary: #f1f1f3;
   --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
+  --muted: #f1f1f3;
+  --muted-foreground: #6c6e74;
+  --accent: #ebebed;
   --accent-foreground: oklch(0.205 0 0);
   --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  --border: #e2e3e6;
+  --input: #dedfe3;
+  --ring: oklch(0.58 0 0);
   --scrollbar-thumb: oklch(0.7 0 0);
   --scrollbar-thumb-hover: oklch(0.6 0 0);
   --scrollbar-size: 8px;
@@ -108,6 +110,32 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+  /* Foundation desktop density; coarse-pointer controls retain 44px targets. */
+  --foundation-toolbar-height: 2.25rem;
+  --foundation-control-height: 2rem;
+  --foundation-control-sm: 1.75rem;
+  --foundation-control-lg: 2.25rem;
+  --foundation-control-radius: 0.3125rem;
+  --foundation-nav-height: 1.75rem;
+  /* Light mode uses one quiet neutral family across the sidebar, outer canvas,
+     and raised workspace. The small luminance steps create hierarchy without
+     the split black/white shell that made the previous theme feel unfinished. */
+  --foundation-sidebar: #f1f1f3;
+  --foundation-sidebar-selected: #e1e2e5;
+  --foundation-sidebar-hover: #e7e7ea;
+  --foundation-sidebar-foreground: #292a2e;
+  --foundation-sidebar-muted: #6c6e74;
+  --foundation-sidebar-border: #dedfe2;
+  --foundation-canvas: #e9eaed;
+  --foundation-surface-raised: #fbfbfc;
+  --foundation-surface-subtle: #f4f4f6;
+  --foundation-hairline: #e4e5e8;
+  --foundation-content-max: 72rem;
+  --foundation-page-gutter: 1.25rem;
+  --foundation-page-gutter-wide: 1.75rem;
+  --foundation-shell-inset: 0.5rem;
+  --foundation-shell-radius: 0.75rem;
+  --foundation-row-radius: 0.5rem;
   --chip-match-title-bg: oklch(0.97 0.02 265);
   --chip-match-title-fg: oklch(0.4 0.13 265);
   --chip-match-title-border: oklch(0.85 0.05 265);
@@ -292,9 +320,9 @@
   --streamlined-task-detail-bg: var(--background);
   --side-panel-tab-active-bg: color-mix(in oklab, var(--accent) 88%, var(--background));
   --side-panel-tab-hover-bg: color-mix(in oklab, var(--accent) 58%, transparent);
-  --radius-task-composer: 16px;
-  --shadow-task-composer: 0 2px 8px -2px color-mix(in oklab, var(--foreground) 7%, transparent),
-    0 12px 32px -8px color-mix(in oklab, var(--foreground) 12%, transparent);
+  --radius-task-composer: 12px;
+  --shadow-task-composer: 0 1px 3px color-mix(in oklab, var(--foreground) 7%, transparent),
+    0 8px 24px -12px color-mix(in oklab, var(--foreground) 10%, transparent);
 
   /* Composer mode-chip hues (v5–v7 decisions): agent + plan reuse the task
      status hues; ask is the v5 blue. Consumed as `--sc` seeds through the
@@ -314,11 +342,11 @@
      INSIDE the scroll viewport (it scrolls away with the messages), so the
      only chrome outside the thread is the top bar plus page padding ≈ 8rem —
      this is what keeps the composer pinned near the viewport bottom. */
-  --tc-thread-max-h: calc(100dvh - 8rem);
+  --tc-thread-max-h: calc(100dvh - 5.75rem);
 
   /* Redesigned chat-shell column cap (phase 2c): one token caps the page
      wrapper, thread body, and pinned composer so they widen in lockstep. */
-  --tc-shell-max-w: 60rem;
+  --tc-shell-max-w: 48rem;
   --sz-66px: 66px;
 
   /* Active-turn status island and its checklist overlay. */
@@ -333,30 +361,56 @@
   --tc-composer-bottom: var(--sz-calc-8);
 }
 
+.foundation-sidebar {
+  --background: var(--foundation-sidebar-selected);
+  --foreground: var(--foundation-sidebar-foreground);
+  --muted: var(--foundation-sidebar-hover);
+  --muted-foreground: var(--foundation-sidebar-muted);
+  --accent: var(--foundation-sidebar-selected);
+  --accent-foreground: var(--foundation-sidebar-foreground);
+  --border: var(--foundation-sidebar-border);
+  --primary: var(--foundation-sidebar-foreground);
+  --primary-foreground: var(--foundation-sidebar);
+  border-right: 1px solid var(--foundation-sidebar-border);
+  background: var(--foundation-sidebar);
+  color: var(--foundation-sidebar-foreground);
+}
+
 .dark {
-  --background: oklch(0.205 0 0);
-  --foreground: oklch(0.985 0 0);
+  color-scheme: dark;
+  --background: #111214;
+  --foreground: #ececef;
   --side-panel-bg: var(--background);
   --side-panel-fg: oklch(0.985 0 0);
   --streamlined-task-detail-bg: var(--background);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --bubble-agent: oklch(0.185 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
+  --card: #17181a;
+  --card-foreground: #ececef;
+  --popover: #1b1c1f;
+  --popover-foreground: #ececef;
+  --primary: #e7e7e9;
+  --primary-foreground: #151618;
+  --bubble-agent: #151619;
+  --secondary: #202124;
+  --secondary-foreground: #ececef;
+  --muted: #1d1e21;
+  --muted-foreground: #96989e;
+  --accent: #26272b;
+  --accent-foreground: #f4f4f5;
   --destructive: oklch(0.637 0.237 25.331); /* Gallery feedback round 1: user preferred master's original dark destructive red over the preset's softer 0.704 0.191 22.216. */
   --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
+  --border: #292a2e;
+  --input: #303136;
+  --ring: #777a82;
+  --foundation-sidebar: #0b0c0e;
+  --foundation-sidebar-selected: #242528;
+  --foundation-sidebar-hover: #18191c;
+  --foundation-sidebar-foreground: #ececee;
+  --foundation-sidebar-muted: #8c8e94;
+  --foundation-sidebar-border: #202125;
+  --foundation-canvas: #08090a;
+  --foundation-surface-raised: #17181a;
+  --foundation-surface-subtle: #141517;
+  --foundation-hairline: #242529;
   --scrollbar-thumb: oklch(0.4 0 0);
   --scrollbar-thumb-hover: oklch(0.5 0 0);
   --chart-1: oklch(0.87 0 0);
@@ -958,20 +1012,253 @@
    task quicklook, both below.
 --------------------------------------------------------------------------- */
 :root {
-  --motion-duration-enter: 160ms;
-  --motion-duration-exit: 110ms;
+  --motion-duration-enter: 140ms;
+  --motion-duration-exit: 90ms;
   --motion-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --motion-ease-in: cubic-bezier(0.4, 0, 1, 1);
 
   /* A crossfading pair must share one duration and one curve. Two elements
      swapping places both change height, and the container shows the SUM. Give
-     them different timing — the outgoing on a 110ms ease-in against the
-     incoming on a 160ms ease-out — and that sum stops being monotonic: the
+     them different timing — the outgoing on a shorter ease-in against the
+     incoming on a longer ease-out — and that sum stops being monotonic: the
      container bulges or dips mid-swap, which reads as a lurch even though each
      half is individually smooth. Run both off the same clock and the same
      curve and the sum collapses to a clean interpolation between the two
      states, because at every moment progress is identical on both sides. */
-  --motion-duration-swap: 150ms;
+  --motion-duration-swap: 130ms;
+}
+
+/* ---------------------------------------------------------------------------
+   Foundation motion system
+   ---------------------------------------------------------------------------
+   The component primitives historically carried animation utility class names,
+   but the utility plugin that defines them is intentionally not installed. The
+   classes therefore produced no motion. These data-slot rules make motion a
+   real primitive-level contract: every dialog, menu, popover, select, tooltip,
+   sheet, disclosure, tab panel and task row receives the same restrained motion
+   without feature teams having to remember to opt in.
+--------------------------------------------------------------------------- */
+@keyframes foundation-overlay-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes foundation-overlay-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes foundation-dialog-in {
+  /* Dialog centering is owned by the element's individual `translate`
+     property. Animate `transform` so the two effects compose instead of the
+     motion system replacing translate(-50%, -50%). */
+  from { opacity: 0; transform: translateY(6px) scale(0.975); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes foundation-dialog-out {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to { opacity: 0; transform: translateY(3px) scale(0.985); }
+}
+
+@keyframes foundation-flyout-in {
+  from {
+    opacity: 0;
+    scale: 0.98;
+    translate: var(--foundation-flyout-x, 0) var(--foundation-flyout-y, -4px);
+  }
+  to { opacity: 1; scale: 1; translate: 0 0; }
+}
+
+@keyframes foundation-flyout-out {
+  from { opacity: 1; scale: 1; translate: 0 0; }
+  to {
+    opacity: 0;
+    scale: 0.985;
+    translate: var(--foundation-flyout-x, 0) var(--foundation-flyout-y, -2px);
+  }
+}
+
+@keyframes foundation-sheet-in {
+  from {
+    opacity: 0.7;
+    translate: var(--foundation-sheet-x, 0) var(--foundation-sheet-y, 0);
+  }
+  to { opacity: 1; translate: 0 0; }
+}
+
+@keyframes foundation-sheet-out {
+  from { opacity: 1; translate: 0 0; }
+  to {
+    opacity: 0.7;
+    translate: var(--foundation-sheet-x, 0) var(--foundation-sheet-y, 0);
+  }
+}
+
+@keyframes foundation-collapse-in {
+  from { height: 0; opacity: 0; }
+  to { height: var(--radix-collapsible-content-height); opacity: 1; }
+}
+
+@keyframes foundation-collapse-out {
+  from { height: var(--radix-collapsible-content-height); opacity: 1; }
+  to { height: 0; opacity: 0; }
+}
+
+@keyframes foundation-content-in {
+  from { opacity: 0; translate: 0 3px; }
+  to { opacity: 1; translate: 0 0; }
+}
+
+:is(
+  [data-slot="dialog-overlay"],
+  [data-slot="alert-dialog-overlay"],
+  [data-slot="sheet-overlay"]
+)[data-state="open"] {
+  animation: foundation-overlay-in var(--motion-duration-fast) var(--motion-ease-standard) both;
+}
+
+:is(
+  [data-slot="dialog-overlay"],
+  [data-slot="alert-dialog-overlay"],
+  [data-slot="sheet-overlay"]
+)[data-state="closed"] {
+  animation: foundation-overlay-out var(--motion-duration-exit) var(--motion-ease-in) both;
+}
+
+:is(
+  [data-slot="dialog-content"],
+  [data-slot="alert-dialog-content"]
+)[data-state="open"] {
+  animation: foundation-dialog-in var(--motion-duration-base) var(--motion-ease-out-expo) both;
+  transform-origin: center;
+}
+
+:is(
+  [data-slot="dialog-content"],
+  [data-slot="alert-dialog-content"]
+)[data-state="closed"] {
+  animation: foundation-dialog-out var(--motion-duration-exit) var(--motion-ease-in) both;
+  transform-origin: center;
+}
+
+:is(
+  [data-slot="dropdown-menu-content"],
+  [data-slot="dropdown-menu-sub-content"],
+  [data-slot="popover-content"],
+  [data-slot="select-content"],
+  [data-slot="tooltip-content"]
+) {
+  will-change: opacity, scale, translate;
+}
+
+:is(
+  [data-slot="dropdown-menu-content"],
+  [data-slot="dropdown-menu-sub-content"],
+  [data-slot="popover-content"],
+  [data-slot="select-content"],
+  [data-slot="tooltip-content"]
+)[data-side="top"] { --foundation-flyout-y: 4px; }
+
+:is(
+  [data-slot="dropdown-menu-content"],
+  [data-slot="dropdown-menu-sub-content"],
+  [data-slot="popover-content"],
+  [data-slot="select-content"],
+  [data-slot="tooltip-content"]
+)[data-side="left"] { --foundation-flyout-x: 4px; --foundation-flyout-y: 0; }
+
+:is(
+  [data-slot="dropdown-menu-content"],
+  [data-slot="dropdown-menu-sub-content"],
+  [data-slot="popover-content"],
+  [data-slot="select-content"],
+  [data-slot="tooltip-content"]
+)[data-side="right"] { --foundation-flyout-x: -4px; --foundation-flyout-y: 0; }
+
+:is(
+  [data-slot="dropdown-menu-content"],
+  [data-slot="dropdown-menu-sub-content"],
+  [data-slot="popover-content"],
+  [data-slot="select-content"]
+)[data-state="open"] {
+  animation: foundation-flyout-in var(--motion-duration-enter) var(--motion-ease-out) both;
+}
+
+:is(
+  [data-slot="dropdown-menu-content"],
+  [data-slot="dropdown-menu-sub-content"],
+  [data-slot="popover-content"],
+  [data-slot="select-content"]
+)[data-state="closed"] {
+  animation: foundation-flyout-out var(--motion-duration-exit) var(--motion-ease-in) both;
+}
+
+[data-slot="tooltip-content"]:is([data-state="instant-open"], [data-state="delayed-open"]) {
+  animation: foundation-flyout-in var(--motion-duration-instant) var(--motion-ease-out) both;
+}
+
+[data-slot="tooltip-content"][data-state="closed"] {
+  animation: foundation-flyout-out var(--motion-duration-instant) var(--motion-ease-in) both;
+}
+
+[data-slot="sheet-content"][data-side="right"] { --foundation-sheet-x: 18px; }
+[data-slot="sheet-content"][data-side="left"] { --foundation-sheet-x: -18px; }
+[data-slot="sheet-content"][data-side="top"] { --foundation-sheet-y: -18px; }
+[data-slot="sheet-content"][data-side="bottom"] { --foundation-sheet-y: 18px; }
+
+[data-slot="sheet-content"][data-state="open"] {
+  animation: foundation-sheet-in var(--motion-duration-base) var(--motion-ease-out-expo) both;
+}
+
+[data-slot="sheet-content"][data-state="closed"] {
+  animation: foundation-sheet-out var(--motion-duration-fast) var(--motion-ease-in) both;
+}
+
+[data-slot="collapsible-content"] {
+  overflow: clip;
+}
+
+[data-slot="collapsible-content"][data-state="open"] {
+  animation: foundation-collapse-in var(--motion-duration-enter) var(--motion-ease-out) both;
+}
+
+[data-slot="collapsible-content"][data-state="closed"] {
+  animation: foundation-collapse-out var(--motion-duration-exit) var(--motion-ease-in) both;
+}
+
+:is(
+  [data-slot="tabs-content"],
+  [data-slot="command-list"],
+  [data-slot="task-row"],
+  [data-slot="entity-row"],
+  [data-slot="context-title"]
+) {
+  animation: foundation-content-in var(--motion-duration-fast) var(--motion-ease-out) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :is(
+    [data-slot="dialog-overlay"],
+    [data-slot="alert-dialog-overlay"],
+    [data-slot="sheet-overlay"],
+    [data-slot="dialog-content"],
+    [data-slot="alert-dialog-content"],
+    [data-slot="dropdown-menu-content"],
+    [data-slot="dropdown-menu-sub-content"],
+    [data-slot="popover-content"],
+    [data-slot="select-content"],
+    [data-slot="tooltip-content"],
+    [data-slot="sheet-content"],
+    [data-slot="collapsible-content"],
+    [data-slot="tabs-content"],
+    [data-slot="command-list"],
+    [data-slot="task-row"],
+    [data-slot="entity-row"],
+    [data-slot="context-title"]
+  ) {
+    animation: none !important;
+  }
 }
 
 /* ---------------------------------------------------------------------------

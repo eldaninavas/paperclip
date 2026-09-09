@@ -122,21 +122,22 @@ export function SidebarNavItem({
       onClick={() => { if (isMobile) setSidebarOpen(false); }}
       className={({ isActive }) =>
         cn(
-          // One rhythm and one inset pill highlight: mx-2 floats the row off
-          // the sidebar edges, rounded-lg matches the card anchor, px-2 gives
-          // the icon breathing room inside the pill. Rows with hover menus
-          // (agents/projects) reserve extra right padding via className.
-          "flex items-center gap-2.5 mx-2 rounded-lg px-2 py-1.5 pointer-coarse:py-1 text-(length:--text-compact) font-medium transition-colors",
+          // Keep icon alignment stable between the full sidebar and collapsed rail.
+          "flex min-h-(--foundation-nav-height) items-center gap-2 rounded-(--foundation-control-radius) px-2.5 py-0.5 pointer-coarse:min-h-11 text-xs font-normal transition-[background-color,color,opacity] duration-(--motion-duration-exit) ease-(--motion-ease-out)",
           (active ?? isActive)
-            ? "bg-background text-foreground"
-            : "text-foreground/80 hover:bg-background hover:text-foreground",
+            ? forceExpanded
+              ? "bg-accent font-medium text-accent-foreground"
+              : "bg-(--foundation-sidebar-selected) font-medium text-foreground"
+            : forceExpanded
+              ? "text-muted-foreground hover:bg-accent/70 hover:text-foreground"
+              : "text-foreground/72 hover:bg-(--foundation-sidebar-hover) hover:text-foreground",
           className,
         )
       }
     >
       {showIconSlot ? (
         <span data-slot="sidebar-nav-icon" className="relative shrink-0">
-          {iconNode ?? (Icon ? <Icon className="h-4 w-4" /> : null)}
+          {iconNode ?? (Icon ? <Icon className="size-3.5 transition-colors duration-(--motion-duration-exit)" strokeWidth={1.7} /> : null)}
           {alert && (
             <span
               data-slot="sidebar-icon-alert-badge"
@@ -203,7 +204,7 @@ export function SidebarNavItem({
               ? "bg-red-600/90 text-red-50"
               : badgeTone === "warning"
                 ? "bg-amber-500/90 text-amber-50"
-                : "bg-primary text-primary-foreground",
+                : "bg-transparent text-muted-foreground",
           )}
         >
           {badge}

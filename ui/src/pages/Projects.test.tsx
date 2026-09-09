@@ -11,6 +11,7 @@ import { Projects } from "./Projects";
 
 const mockProjectsApi = vi.hoisted(() => ({
   list: vi.fn(),
+  update: vi.fn(),
 }));
 
 const mockResourceMembershipsApi = vi.hoisted(() => ({
@@ -142,6 +143,10 @@ describe("Projects", () => {
         updatedAt: new Date("2026-01-01T00:00:00Z"),
       }),
     ]);
+    mockProjectsApi.update.mockImplementation(async (projectId: string, patch: Partial<Project>) => ({
+      ...makeProject({ id: projectId }),
+      ...patch,
+    }));
     mockResourceMembershipsApi.listMine.mockResolvedValue({
       projectMemberships: { "project-b": "left" },
       agentMemberships: {},
@@ -212,10 +217,10 @@ describe("Projects", () => {
 
     const content = container.textContent ?? "";
     expect(container.querySelector('button[title="Sort"]')?.textContent).toContain("Sort: Name");
-    expect(content.indexOf("My Projects")).toBeLessThan(content.indexOf("Alpha"));
+    expect(content).not.toContain("My Projects");
     expect(content.indexOf("Alpha")).toBeLessThan(content.indexOf("Charlie"));
-    expect(content.indexOf("Charlie")).toBeLessThan(content.indexOf("Other Projects"));
-    expect(content.indexOf("Other Projects")).toBeLessThan(content.indexOf("Bravo"));
+    expect(content.indexOf("Charlie")).toBeLessThan(content.indexOf("Other projects"));
+    expect(content.indexOf("Other projects")).toBeLessThan(content.indexOf("Bravo"));
     expect(content).toContain("in progress");
   });
 
@@ -225,9 +230,9 @@ describe("Projects", () => {
     await chooseSortField("Updated");
 
     const content = container.textContent ?? "";
-    expect(content.indexOf("My Projects")).toBeLessThan(content.indexOf("Charlie"));
+    expect(content).not.toContain("My Projects");
     expect(content.indexOf("Charlie")).toBeLessThan(content.indexOf("Alpha"));
-    expect(content.indexOf("Alpha")).toBeLessThan(content.indexOf("Other Projects"));
+    expect(content.indexOf("Alpha")).toBeLessThan(content.indexOf("Other projects"));
   });
 
   it("reserves description line height for projects without descriptions", async () => {
@@ -240,5 +245,31 @@ describe("Projects", () => {
 
     expect(hiddenDescriptionLine).not.toBeNull();
     expect(hiddenDescriptionLine?.className).toContain("min-h-4");
+  });
+
+  it("updates a project icon directly from its list row", async () => {
+    await renderProjects();
+
+    const trigger = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Change project icon, emoji, and color"]',
+    );
+    expect(trigger).not.toBeNull();
+
+    let navigationAllowed = true;
+    await act(async () => {
+      trigger?.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, button: 0 }));
+      navigationAllowed = trigger?.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true })) ?? true;
+    });
+    await flushReact();
+    expect(navigationAllowed).toBe(false);
+
+    const rocket = document.body.querySelector<HTMLButtonElement>('button[aria-label="Use rocket icon"]');
+    expect(rocket).not.toBeNull();
+    await act(async () => {
+      rocket?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    await flushReact();
+
+    expect(mockProjectsApi.update).toHaveBeenCalledWith("project-a", { icon: "rocket" }, "company-1");
   });
 });

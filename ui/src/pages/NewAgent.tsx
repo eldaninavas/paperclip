@@ -9,7 +9,7 @@ import { issuesApi } from "../api/issues";
 import { projectsApi } from "../api/projects";
 import { queryKeys } from "../lib/queryKeys";
 import { resolveSkillSummaryText } from "../lib/company-skill-summary";
-import { AGENT_ROLES, type AdapterEnvironmentTestResult, type AgentPermissions } from "@paperclipai/shared";
+import { AGENT_ICON_NAMES, AGENT_ROLES, type AdapterEnvironmentTestResult, type AgentIconName, type AgentPermissions } from "@paperclipai/shared";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -37,6 +37,8 @@ import {
 } from "../adapters/use-disabled-adapters";
 import { isValidAdapterType } from "../adapters/metadata";
 import { ReportsToPicker } from "../components/ReportsToPicker";
+import { AgentIcon, AgentIconPicker } from "../components/AgentIconPicker";
+import { DEFAULT_AGENT_IDENTITY, parseAgentIdentity, serializeAgentIdentity } from "../components/AgentIdentity";
 import { buildNewAgentHirePayload } from "../lib/new-agent-hire-payload";
 import { TrustPresetSection } from "../components/TrustPresetSection";
 import { buildPermissionsForTrustPreset, getTrustPreset } from "../lib/trust-policy-ui";
@@ -66,6 +68,13 @@ function createValuesForAdapterType(
   return nextValues;
 }
 
+function requestedAgentIcon(value: string | null): string {
+  if (parseAgentIdentity(value)) return value!;
+  return value && AGENT_ICON_NAMES.includes(value as AgentIconName)
+    ? value
+    : serializeAgentIdentity(DEFAULT_AGENT_IDENTITY);
+}
+
 export function NewAgent() {
   const { selectedCompanyId } = useCompany();
   const { setBreadcrumbs } = useBreadcrumbs();
@@ -76,6 +85,7 @@ export function NewAgent() {
 
   const [name, setName] = useState("");
   const [title, setTitle] = useState("");
+  const [icon, setIcon] = useState<string>(() => requestedAgentIcon(searchParams.get("icon")));
   const [role, setRole] = useState("general");
   const [reportsTo, setReportsTo] = useState<string | null>(null);
   const [configValues, setConfigValues] = useState<CreateConfigValues>(defaultCreateValues);
@@ -185,6 +195,7 @@ export function NewAgent() {
     createAgent.mutate(
       buildNewAgentHirePayload({
         name,
+        icon,
         effectiveRole,
         title,
         reportsTo,
@@ -266,25 +277,32 @@ export function NewAgent() {
       </div>
 
       <div className="border border-border">
-        {/* Name */}
-        <div className="px-4 pt-4 pb-2">
-          <input
-            className="w-full text-lg font-semibold bg-transparent outline-none placeholder:text-muted-foreground/50"
-            placeholder="Agent name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            autoFocus
-          />
-        </div>
-
-        {/* Title */}
-        <div className="px-4 pb-2">
-          <input
-            className="w-full bg-transparent outline-none text-sm text-muted-foreground placeholder:text-muted-foreground/40"
-            placeholder="Title (e.g. VP of Engineering)"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-          />
+        {/* Identity: chosen at creation time, not as post-creation cleanup. */}
+        <div className="flex items-start gap-3 px-4 py-4">
+          <AgentIconPicker value={icon} onChange={(nextIcon) => setIcon(requestedAgentIcon(nextIcon))}>
+            <button
+              type="button"
+              aria-label="Choose agent identity"
+              className="flex size-11 shrink-0 items-center justify-center rounded-lg border border-border bg-(--foundation-surface-subtle) text-foreground transition-[background-color,border-color] duration-(--motion-duration-exit) hover:border-foreground/25 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <AgentIcon icon={icon} className="size-5" />
+            </button>
+          </AgentIconPicker>
+          <div className="min-w-0 flex-1 space-y-1.5">
+            <input
+              className="w-full bg-transparent text-lg font-semibold outline-none placeholder:text-muted-foreground/50"
+              placeholder="Agent name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              autoFocus
+            />
+            <input
+              className="w-full bg-transparent text-sm text-muted-foreground outline-none placeholder:text-muted-foreground/40"
+              placeholder="Title (e.g. VP of Engineering)"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+            />
+          </div>
         </div>
 
         {/* Property chips: Role + Reports To */}
@@ -359,7 +377,7 @@ export function NewAgent() {
             <div>
               <h2 className="text-sm font-medium">Organization skills</h2>
               <p className="mt-1 text-xs text-muted-foreground">
-                Optional skills from the organization library. Built-in Paperclip runtime skills are added automatically.
+                Optional skills from the organization library. Built-in Foundation runtime skills are added automatically.
               </p>
             </div>
             {availableSkills.length === 0 ? (
