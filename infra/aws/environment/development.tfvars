@@ -1,0 +1,11 @@
+environment                    = "development"
+domain_name                    = "dev.foundation.davaria.app"
+vpc_cidr                       = "10.20.0.0/16"
+database_instance_class        = "db.t4g.micro"
+database_allocated_storage     = 20
+database_max_allocated_storage = 50
+database_backup_retention_days = 3
+database_deletion_protection   = false
+database_multi_az              = false
+desired_count                  = 0
+log_retention_days             = 14

@@ -1,0 +1,118 @@
+name: Foundation deploy
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+    inputs:
+      deploy_production:
+        description: Promote the exact tested image to production
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: foundation-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: mx-central-1
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.11.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @paperclipai/server typecheck
+      - run: pnpm --filter @paperclipai/ui typecheck
+      - run: pnpm --filter @paperclipai/ui build
+
+  build-and-deploy-development:
+    needs: verify
+    runs-on: ubuntu-24.04-arm
+    environment: development
+    outputs:
+      image: ${{ steps.image.outputs.uri }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      - id: login
+        uses: aws-actions/amazon-ecr-login@v2
+      - id: image
+        env:
+          REGISTRY: ${{ steps.login.outputs.registry }}
+          REPOSITORY: foundation/server
+          IMAGE_TAG: ${{ github.sha }}
+        run: echo "uri=$REGISTRY/$REPOSITORY:$IMAGE_TAG" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/arm64
+          push: true
+          tags: ${{ steps.image.outputs.uri }}
+          build-args: |
+            PAPERCLIP_BUILD_COMMIT=${{ github.sha }}
+            PAPERCLIP_BUILD_VERSION=foundation-${{ github.run_number }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Deploy immutable image to development
+        env:
+          IMAGE: ${{ steps.image.outputs.uri }}
+          CLUSTER: foundation-dev
+          SERVICE: foundation-dev
+          FAMILY: foundation-dev
+        run: |
+          aws ecs describe-task-definition --task-definition "$FAMILY" --query taskDefinition > task-definition.json
+          jq --arg image "$IMAGE" '
+            .containerDefinitions |= map(if .name == "foundation" then .image = $image else . end)
+            | del(.taskDefinitionArn,.revision,.status,.requiresAttributes,.compatibilities,.registeredAt,.registeredBy)
+          ' task-definition.json > next-task-definition.json
+          TASK_ARN=$(aws ecs register-task-definition --cli-input-json file://next-task-definition.json --query taskDefinition.taskDefinitionArn --output text)
+          aws ecs update-service --cluster "$CLUSTER" --service "$SERVICE" --task-definition "$TASK_ARN" --desired-count 1 --force-new-deployment
+          aws ecs wait services-stable --cluster "$CLUSTER" --services "$SERVICE"
+      - name: Verify development health through Cloudflare Access
+        env:
+          HEALTH_URL: https://dev.foundation.davaria.app/api/health
+        run: |
+          STATUS=$(curl --silent --output /dev/null --write-out '%{http_code}' "$HEALTH_URL")
+          test "$STATUS" = "302" || test "$STATUS" = "401"
+
+  deploy-production:
+    if: github.event_name == 'workflow_dispatch' && inputs.deploy_production
+    needs: build-and-deploy-development
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Promote tested image to production
+        env:
+          IMAGE: ${{ needs.build-and-deploy-development.outputs.image }}
+          CLUSTER: foundation-prod
+          SERVICE: foundation-prod
+          FAMILY: foundation-prod
+        run: |
+          aws ecs describe-task-definition --task-definition "$FAMILY" --query taskDefinition > task-definition.json
+          jq --arg image "$IMAGE" '
+            .containerDefinitions |= map(if .name == "foundation" then .image = $image else . end)
+            | del(.taskDefinitionArn,.revision,.status,.requiresAttributes,.compatibilities,.registeredAt,.registeredBy)
+          ' task-definition.json > next-task-definition.json
+          TASK_ARN=$(aws ecs register-task-definition --cli-input-json file://next-task-definition.json --query taskDefinition.taskDefinitionArn --output text)
+          aws ecs update-service --cluster "$CLUSTER" --service "$SERVICE" --task-definition "$TASK_ARN" --desired-count 1 --force-new-deployment
+          aws ecs wait services-stable --cluster "$CLUSTER" --services "$SERVICE"

@@ -77,3 +77,8 @@ tests/storybook-visual/playwright-report/
 .vercel/
 .env.local
 test-results/
+
+# Terraform provider caches and local state (lock files remain committed)
+**/.terraform/
+*.tfstate
+*.tfstate.*
