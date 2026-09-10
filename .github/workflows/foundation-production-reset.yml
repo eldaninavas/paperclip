@@ -215,7 +215,7 @@ jobs:
             --service "$SERVICE" \
             --task-definition "$RESET_TASK_DEFINITION" \
             --desired-count 1 \
-            --deployment-configuration maximumPercent=100,minimumHealthyPercent=0 \
+            --deployment-configuration maximumPercent=200,minimumHealthyPercent=0 \
             --force-new-deployment >/dev/null
           aws ecs wait services-stable --cluster "$CLUSTER" --services "$SERVICE"
 
