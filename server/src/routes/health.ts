@@ -65,6 +65,10 @@ function hasWorkspaceReadinessToken(providedToken: string | undefined) {
   return matchesSharedToken(resolveWorkspaceReadinessLocalToken(), providedToken);
 }
 
+function isTruthyEnvValue(value: string | undefined) {
+  return ["1", "true", "yes", "on"].includes(value?.trim().toLowerCase() ?? "");
+}
+
 function redactedDatabaseBackupWarning(warning: DatabaseBackupHealthWarning): DatabaseBackupHealthWarning {
   const messages: Record<DatabaseBackupHealthWarning["code"], string> = {
     database_backup_check_failed: "Database backup health check failed.",
@@ -340,6 +344,9 @@ export function healthRoutes(
       bootstrapInviteActive,
       features: {
         companyDeletionEnabled: opts.companyDeletionEnabled,
+        foundationCloudExecutionEnabled: isTruthyEnvValue(
+          runtimeEnv.FOUNDATION_CLOUD_EXECUTION,
+        ),
       },
       serverInfo,
       ...(databaseBackup ? { databaseBackup } : {}),

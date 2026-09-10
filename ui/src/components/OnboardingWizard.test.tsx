@@ -1867,7 +1867,10 @@ describe("OnboardingWizard restore-gate (stale localStorage across accounts)", (
     });
 
     /** Drives the wizard to the Connect step with a company already created. */
-    async function openStep4(overrides: Record<string, unknown> = {}) {
+    async function openStep4(
+      overrides: Record<string, unknown> = {},
+      options: { cloudManaged?: boolean } = {},
+    ) {
       mockCompany.companies = [{ id: "company-new", name: "Initech", issuePrefix: "INI" }];
       mockCompany.loading = false;
       mockCompaniesApi.list.mockResolvedValue(mockCompany.companies);
@@ -1886,6 +1889,12 @@ describe("OnboardingWizard restore-gate (stale localStorage across accounts)", (
       mockDialog.onboardingOptions = {};
 
       const { root, queryClient } = render();
+      if (options.cloudManaged) {
+        queryClient.setQueryData(queryKeys.health, {
+          status: "ok",
+          features: { foundationCloudExecutionEnabled: true },
+        });
+      }
       await act(async () => {
         root.render(
           <QueryClientProvider client={queryClient}>
@@ -1925,6 +1934,27 @@ describe("OnboardingWizard restore-gate (stale localStorage across accounts)", (
       // registry label is the adapter type, and it must not reach the tile.
       expect(labels.join(" ")).not.toContain("claude_local");
       expect(labels.join(" ")).not.toContain("codex_local");
+
+      await act(async () => root.unmount());
+    });
+
+    it("offers API keys, never laptop subscriptions, on Foundation Cloud", async () => {
+      mockEnvironmentsApi.list.mockResolvedValue([
+        { ...SANDBOX_ENVIRONMENT, metadata: { managedByPaperclip: true } },
+      ]);
+      mockInstanceSettingsApi.getExperimental.mockResolvedValue({
+        enableManagedSandboxOnly: true,
+      });
+      const { root } = await openStep4(
+        { adapterType: "claude_local", credentialMode: "subscription" },
+        { cloudManaged: true },
+      );
+
+      expect(document.body.textContent).toContain("Foundation Cloud");
+      expect(document.body.textContent).toContain("Runtime listo");
+      expect(document.body.textContent).toContain("Conecta una API key propia");
+      expect(document.body.textContent).not.toContain("Local subscription");
+      expect(document.body.textContent).not.toContain("Use subscription instead");
 
       await act(async () => root.unmount());
     });

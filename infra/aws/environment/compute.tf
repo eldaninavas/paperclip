@@ -57,6 +57,7 @@ resource "aws_ecs_task_definition" "environment" {
       { name = "PAPERCLIP_ALLOWED_HOSTNAMES", value = each.value.domain },
       { name = "PAPERCLIP_MIGRATION_AUTO_APPLY", value = "true" },
       { name = "PAPERCLIP_AUTH_RATE_LIMIT_ENABLED", value = "true" },
+      { name = "FOUNDATION_CLOUD_EXECUTION", value = "true" },
       { name = "HEARTBEAT_SCHEDULER_ENABLED", value = "true" }
     ]
     secrets = [

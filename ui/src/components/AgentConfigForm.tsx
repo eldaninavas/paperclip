@@ -32,7 +32,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
-import { FolderOpen, Heart, ChevronDown, X, Copy, Check, ExternalLink, Loader2, TriangleAlert, Bug, Laptop, Server, KeyRound } from "lucide-react";
+import { FolderOpen, Heart, ChevronDown, X, Copy, Check, ExternalLink, Loader2, TriangleAlert, Bug, Laptop, Server, Cloud } from "lucide-react";
 import { asBoolean, asFiniteNumber, asObject, cn } from "../lib/utils";
 import { copyTextToClipboard } from "../lib/clipboard";
 import {
@@ -83,6 +83,7 @@ import { useDisabledAdaptersSync } from "../adapters/use-disabled-adapters";
 import { buildAgentUpdatePatch, omitUndefinedEntries, type AgentConfigOverlay } from "../lib/agent-config-patch";
 import { useAdapterCapabilities } from "../adapters/use-adapter-capabilities";
 import { resolveForcedKubernetesEnvironment } from "../lib/forced-kubernetes-environment";
+import { useFoundationCloudExecution } from "../hooks/useCloudInstance";
 
 /* ---- Create mode values ---- */
 
@@ -265,7 +266,7 @@ const REMOTE_RUNNER_ADAPTER_TYPES = [
   "openclaw_gateway",
 ] as const;
 
-type AiConnectionMode = "local" | "remote" | "advanced";
+type AiConnectionMode = "local" | "foundation_cloud" | "remote" | "advanced";
 
 function aiConnectionMode(adapterType: string): AiConnectionMode {
   if ((LOCAL_ACCOUNT_ADAPTER_TYPES as readonly string[]).includes(adapterType)) return "local";
@@ -296,6 +297,7 @@ export function AgentConfigForm(props: AgentConfigFormProps) {
   const hideInstructionsFile = props.hideInstructionsFile ?? false;
   const canConfigureProviderTrace = props.canConfigureProviderTrace === true;
   const { selectedCompanyId } = useCompany();
+  const cloudManaged = useFoundationCloudExecution();
   const queryClient = useQueryClient();
   const environmentVariablesEditorRef = useRef<EnvironmentVariablesEditorHandle | null>(null);
   const [advancedConnectionOpen, setAdvancedConnectionOpen] = useState(false);
@@ -358,6 +360,10 @@ export function AgentConfigForm(props: AgentConfigFormProps) {
   // execution-engine choice. Declared here because the field gates below and
   // the adapter field props both read it.
   const managedSandboxOnly = experimentalSettings?.enableManagedSandboxOnly === true;
+  // Davaria-hosted Foundation is also identified by its managed-runtime policy;
+  // it does not need to be enrolled in the upstream Paperclip Cloud control
+  // plane for the UI to know that the customer's browser is not a runtime.
+  const foundationCloudExecution = cloudManaged || managedSandboxOnly;
   // The gate the host-path fields use. It fails closed whenever the policy is
   // unknown — in flight and also on a failed read: an unresolved policy reads as
   // "not managed", which would show a stored working directory or
@@ -1252,7 +1258,15 @@ export function AgentConfigForm(props: AgentConfigFormProps) {
     }));
   }
 
-  const connectionMode = aiConnectionMode(adapterType);
+  const adapterConnectionMode = aiConnectionMode(adapterType);
+  // The legacy `*_local` adapter names describe the command being launched,
+  // not necessarily the machine that launches it. On a managed Cloud instance
+  // those commands run inside the platform sandbox, never in the customer's
+  // browser or laptop.
+  const connectionMode: AiConnectionMode =
+    foundationCloudExecution && managedSandboxOnly && adapterConnectionMode === "local"
+      ? "foundation_cloud"
+      : adapterConnectionMode;
   const firstAvailableLocalAdapter = LOCAL_ACCOUNT_ADAPTER_TYPES.find(
     (type) => !adapterPickerDisabledTypes.has(type),
   );
@@ -1479,23 +1493,38 @@ export function AgentConfigForm(props: AgentConfigFormProps) {
         <div className={cn(cards ? "border border-border rounded-lg p-4 space-y-3" : "px-4 pb-3 space-y-3")}>
           {showAdapterTypeField && (
             <div className="space-y-4">
-              <div className="grid gap-2 md:grid-cols-3">
+              <div className={cn("grid gap-2", foundationCloudExecution ? "md:grid-cols-2" : "md:grid-cols-3")}>
+                {!foundationCloudExecution && (
+                  <ConnectionModeCard
+                    icon={Laptop}
+                    title="En este equipo"
+                    description="Usa una cuenta o suscripción iniciada en esta computadora."
+                    selected={connectionMode === "local"}
+                    disabled={!firstAvailableLocalAdapter}
+                    onClick={() => {
+                      if (connectionMode !== "local" && firstAvailableLocalAdapter) {
+                        changeAdapterType(firstAvailableLocalAdapter);
+                      }
+                    }}
+                  />
+                )}
                 <ConnectionModeCard
-                  icon={Laptop}
-                  title="En este equipo"
-                  description="Usa una cuenta o suscripción iniciada localmente."
-                  selected={connectionMode === "local"}
-                  disabled={!firstAvailableLocalAdapter}
+                  icon={Cloud}
+                  title="Foundation Cloud"
+                  description="Runtime aislado administrado por Foundation; consumo del modelo facturado por separado."
+                  selected={connectionMode === "foundation_cloud"}
+                  disabled={!foundationCloudExecution || !managedSandboxOnly || !firstAvailableLocalAdapter}
+                  badge={!foundationCloudExecution ? "Solo en Cloud" : !managedSandboxOnly ? "Sin activar" : undefined}
                   onClick={() => {
-                    if (connectionMode !== "local" && firstAvailableLocalAdapter) {
+                    if (connectionMode !== "foundation_cloud" && firstAvailableLocalAdapter) {
                       changeAdapterType(firstAvailableLocalAdapter);
                     }
                   }}
                 />
                 <ConnectionModeCard
                   icon={Server}
-                  title="Runner remoto"
-                  description="Ejecuta en Foundation Cloud o en otro equipo autorizado."
+                  title="Runner remoto propio"
+                  description="Ejecuta en una máquina que tu organización conecta y autoriza explícitamente."
                   selected={connectionMode === "remote"}
                   disabled={!firstAvailableRemoteAdapter}
                   badge={!firstAvailableRemoteAdapter ? "Próximamente" : undefined}
@@ -1505,20 +1534,25 @@ export function AgentConfigForm(props: AgentConfigFormProps) {
                     }
                   }}
                 />
-                <ConnectionModeCard
-                  icon={KeyRound}
-                  title="API / servidor"
-                  description="Para ejecución continua con facturación por uso."
-                  selected={false}
-                  disabled
-                  badge="Próximamente"
-                />
               </div>
 
               {connectionMode === "local" ? (
                 <Field
                   label="Proveedor"
                   hint="Foundation usa la sesión que ya existe en este entorno; no copia tu suscripción ni tus credenciales."
+                >
+                  <AdapterTypeDropdown
+                    value={adapterType}
+                    disabledTypes={adapterPickerDisabledTypes}
+                    allowedTypes={LOCAL_ACCOUNT_ADAPTER_TYPES}
+                    showDescriptions
+                    onChange={changeAdapterType}
+                  />
+                </Field>
+              ) : connectionMode === "foundation_cloud" ? (
+                <Field
+                  label="Proveedor de modelo"
+                  hint="La API key se guarda como secreto del usuario. Foundation Cloud no intenta usar una suscripción iniciada en tu computadora."
                 >
                   <AdapterTypeDropdown
                     value={adapterType}

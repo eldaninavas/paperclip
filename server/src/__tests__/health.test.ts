@@ -116,6 +116,18 @@ describe("GET /health", () => {
     });
   });
 
+  it("announces a Davaria-hosted Foundation runtime explicitly", async () => {
+    const app = createApp(createHealthyDb(), testServerInfo, undefined, {
+      FOUNDATION_CLOUD_EXECUTION: "true",
+    });
+
+    const res = await request(app).get("/health");
+
+    expect(res.status).toBe(200);
+    expect(res.body.features?.foundationCloudExecutionEnabled).toBe(true);
+    expect(Object.prototype.hasOwnProperty.call(res.body, "cloud")).toBe(false);
+  });
+
   it("lists operator-hidden settings and drops unknown keys", async () => {
     const app = createApp(undefined, testServerInfo, undefined, {
       PAPERCLIP_HIDDEN_SETTINGS: "instance.plugins,instance.adapters,instance.bogus",

@@ -13,6 +13,7 @@ import { AgentConfigForm, AdapterLoginPanel, type AdapterLoginDescriptor } from 
 import { defaultCreateValues } from "./agent-config-defaults";
 import { buildNewAgentHirePayload } from "../lib/new-agent-hire-payload";
 import { ApiError } from "../api/client";
+import { queryKeys } from "../lib/queryKeys";
 
 const mockAgentsApi = vi.hoisted(() => ({
   adapterModels: vi.fn(),
@@ -253,6 +254,7 @@ async function renderForm(
     showAdapterTestEnvironmentButton?: boolean;
     showAdapterTypeField?: boolean;
     content?: "configuration" | "secrets";
+    cloudManaged?: boolean;
   } = {},
 ) {
   mockEnvironmentsApi.list.mockResolvedValue(environments);
@@ -266,6 +268,12 @@ async function renderForm(
       mutations: { retry: false },
     },
   });
+  if (options.cloudManaged) {
+    queryClient.setQueryData(queryKeys.health, {
+      status: "ok",
+      features: { foundationCloudExecutionEnabled: true },
+    });
+  }
 
   await act(async () => {
     root.render(
@@ -868,13 +876,39 @@ describe("AgentConfigForm environment selector", () => {
     expect(result.container.textContent).toContain("Conexión de IA");
     expect(result.container.textContent).toContain("En este equipo");
     expect(result.container.textContent).toContain("Runner remoto");
-    expect(result.container.textContent).toContain("API / servidor");
+    // API keys are credentials, not an execution location. They belong inside
+    // the selected runtime/provider configuration instead of masquerading as a
+    // third runtime card.
+    expect(result.container.textContent).not.toContain("API / servidor");
     const localModeButton = Array.from(result.container.querySelectorAll("button")).find(
       (button) => button.textContent?.includes("En este equipo"),
     );
     expect(localModeButton?.getAttribute("aria-pressed")).toBe("true");
-    expect(result.container.textContent).toContain("Usa una cuenta o suscripción iniciada localmente");
+    expect(result.container.textContent).toContain("Usa una cuenta o suscripción iniciada en esta computadora");
     expect(result.container.textContent).not.toContain("Adapter type");
+  });
+
+  it("never presents the customer's browser as a local runtime on Foundation Cloud", async () => {
+    mockInstanceSettingsApi.getExperimental.mockResolvedValue({
+      enableManagedSandboxOnly: true,
+      enableNativeRunner: true,
+    });
+    const result = await renderForm(
+      [makeEnvironment({
+        id: "managed-1",
+        name: "Foundation Cloud",
+        driver: "sandbox",
+        metadata: { managedByPaperclip: true },
+      })],
+      {},
+      { showAdapterTypeField: true, cloudManaged: true },
+    );
+    roots.push(result.root);
+
+    expect(result.container.textContent).not.toContain("En este equipo");
+    expect(result.container.textContent).toContain("Foundation Cloud");
+    expect(result.container.textContent).toContain("Runner remoto propio");
+    expect(result.container.textContent).not.toContain("Ejecuta en Foundation Cloud o en otro equipo");
   });
 
   it("renders non-local adapter config fields in the AI connection card", async () => {

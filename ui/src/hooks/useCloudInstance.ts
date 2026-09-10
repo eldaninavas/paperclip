@@ -16,3 +16,21 @@ export function useCloudInstance() {
 
   return healthQuery.data?.cloud ?? null;
 }
+
+/**
+ * True for any hosted Foundation deployment whose browser is only the control
+ * plane. Davaria Cloud sets the explicit feature flag; upstream Paperclip Cloud
+ * continues to be recognized by its stack metadata.
+ */
+export function useFoundationCloudExecution() {
+  const healthQuery = useQuery({
+    queryKey: queryKeys.health,
+    queryFn: () => healthApi.get(),
+    enabled: false,
+  });
+
+  return Boolean(
+    healthQuery.data?.cloud ||
+      healthQuery.data?.features?.foundationCloudExecutionEnabled,
+  );
+}

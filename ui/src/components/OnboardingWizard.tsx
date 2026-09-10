@@ -77,7 +77,7 @@ import {
   resolveRouteOnboardingOptions,
 } from "../lib/onboarding-route";
 import { useCompanyMission } from "../hooks/useCompanyMission";
-import { useCloudInstance } from "../hooks/useCloudInstance";
+import { useCloudInstance, useFoundationCloudExecution } from "../hooks/useCloudInstance";
 import {
   isExistingCompanyMissionUnresolved,
   planMissionPersistence,
@@ -118,6 +118,7 @@ import {
   Check,
   Loader2,
   ChevronDown,
+  Cloud,
 } from "lucide-react";
 
 type Step = 0 | 1 | 2 | 3 | 4 | 5;
@@ -534,6 +535,7 @@ function OnboardingWizardInner({
   // Managed stacks create organizations on Cloud, so the route below never
   // resolves into the create wizard there — see resolveRouteOnboardingOptions.
   const cloudInstance = useCloudInstance();
+  const cloudManaged = useFoundationCloudExecution();
 
   // Support opening the wizard from a route (e.g. /onboarding or an existing
   // company's "add agent" entry point) in addition to the dialog context.
@@ -680,8 +682,13 @@ function OnboardingWizardInner({
    * already said no to.
    */
   const [credentialMode, setCredentialMode] = useState<CredentialMode>(
-    (saved?.credentialMode as CredentialMode) ?? "subscription",
+    cloudManaged ? "api" : (saved?.credentialMode as CredentialMode) ?? "subscription",
   );
+  // A browser connected to Foundation Cloud is not an execution host and
+  // cannot inherit a Claude Code or Codex login from the customer's laptop.
+  // Keep the stored state for desktop/self-hosted installs, but make Cloud's
+  // effective contract API-only until the managed runtime owns credentials.
+  const effectiveCredentialMode: CredentialMode = cloudManaged ? "api" : credentialMode;
   /**
    * Whether Connect has been pressed for the current source.
    *
@@ -958,7 +965,7 @@ function OnboardingWizardInner({
       step, companyName, companyGoal, missionPath, missionConfirmed,
       q1, q2, q3, q4, agentName, agentIdentity, agentRole, adapterType, cwd, model, command, args, url,
       // The mode, never the key: this blob is localStorage.
-      credentialMode,
+      credentialMode: effectiveCredentialMode,
       createdCompanyId, createdCompanyPrefix, createdAgentId,
       createdCompanyGoalId, createdProjectId, createdIssueRef,
       onboardingPath, growWorkflows, growPainPoints, growAutomate,
@@ -967,7 +974,7 @@ function OnboardingWizardInner({
   }, [
     effectiveOnboardingOpen, step, companyName, companyGoal, missionPath, missionConfirmed,
     q1, q2, q3, q4, agentName, agentIdentity, agentRole, adapterType, cwd, model, command, args, url,
-    credentialMode,
+    effectiveCredentialMode,
     createdCompanyId, createdCompanyPrefix, createdAgentId,
     createdCompanyGoalId, createdProjectId, createdIssueRef,
     onboardingPath, growWorkflows, growPainPoints, growAutomate,
@@ -1017,6 +1024,14 @@ function OnboardingWizardInner({
     queryFn: () => instanceSettingsApi.getExperimental(),
     enabled: effectiveOnboardingOpen && step >= 3 && step <= 5,
   });
+  const foundationCloudExecution =
+    cloudManaged || experimentalSettingsForLogin?.enableManagedSandboxOnly === true;
+  const runtimeCredentialMode: CredentialMode = foundationCloudExecution
+    ? "api"
+    : effectiveCredentialMode;
+  useEffect(() => {
+    if (foundationCloudExecution && credentialMode !== "api") setCredentialMode("api");
+  }, [foundationCloudExecution, credentialMode]);
   const resolvedLoginEnvironmentId = useMemo(() => {
     try {
       return resolveAdapterTestEnvironmentId({
@@ -1153,11 +1168,16 @@ function OnboardingWizardInner({
   // host. Cloud onboarding must not create an agent when there is no sandbox
   // capable of performing and retaining that sign-in: doing so only defers the
   // failure until the first message and misleadingly reports a connection.
-  const connectStepHasNoSandbox =
-    credentialMode !== "api" &&
-    experimentalSettingsForLogin?.enableManagedSandboxOnly === true &&
-    !canShowAdapterLogin &&
-    !authSignalUndecided;
+  const cloudRuntimeReady =
+    !foundationCloudExecution ||
+    (experimentalSettingsForLogin?.enableManagedSandboxOnly === true &&
+      resolveManagedSandboxEnvironmentId(loginEnvironmentList) !== null);
+  const connectStepHasNoSandbox = foundationCloudExecution
+    ? !cloudRuntimeReady
+    : runtimeCredentialMode !== "api" &&
+      experimentalSettingsForLogin?.enableManagedSandboxOnly === true &&
+      !canShowAdapterLogin &&
+      !authSignalUndecided;
 
   /**
    * Whether the connect step may advance.
@@ -1192,7 +1212,7 @@ function OnboardingWizardInner({
    * exactly as it did before.
    */
   const connectStepNeedsLogin = Boolean(
-    credentialMode !== "api" &&
+    runtimeCredentialMode !== "api" &&
       showAdapterLoginPanel &&
       createdCompanyId &&
       resolvedLoginEnvironmentId,
@@ -1270,7 +1290,7 @@ function OnboardingWizardInner({
    */
   const canvasOpen =
     sourceSelected &&
-    (credentialMode === "api" || loginStarted || connectStepHasNoSandbox);
+    (runtimeCredentialMode === "api" || loginStarted || connectStepHasNoSandbox);
 
   // The default (or a saved) adapterType can name an adapter the server has
   // since disabled — e.g. a cloud sandbox registry without claude_local. The
@@ -1340,7 +1360,7 @@ function OnboardingWizardInner({
     setAdapterEnvResult(null);
     adapterEnvResultAppliedStoredLoginRef.current = false;
     setAdapterEnvError(null);
-  }, [step, adapterType, model, command, args, url, credentialMode, apiKey]);
+  }, [step, adapterType, model, command, args, url, runtimeCredentialMode, apiKey]);
 
   // A login belongs to one source in one credential mode. Switching either
   // means the card on screen is answering a question nobody asked any more, so
@@ -1350,7 +1370,7 @@ function OnboardingWizardInner({
   useEffect(() => {
     setLoginStarted(false);
     setLoginConnected(false);
-  }, [adapterType, credentialMode]);
+  }, [adapterType, runtimeCredentialMode]);
 
   const selectedModel = (adapterModels ?? []).find((m) => m.id === model);
   const hasAnthropicApiKeyOverrideCheck =
@@ -1679,7 +1699,7 @@ function OnboardingWizardInner({
     // present. If storing failed this stays false, and the right outcome is a
     // configuration with no credential — which the hire then blocks on — rather
     // than one that quietly falls back to embedding the value.
-    if (credentialMode === "api" && bindApiKey) {
+    if (runtimeCredentialMode === "api" && bindApiKey) {
       const env =
         typeof config.env === "object" && config.env !== null && !Array.isArray(config.env)
           ? { ...(config.env as Record<string, unknown>) }
@@ -2020,7 +2040,7 @@ function OnboardingWizardInner({
       // hire describe it the same way — as a reference. A failure here stops the
       // hire rather than falling through to a configuration with no credential.
       let apiKeyStored = false;
-      if (credentialMode === "api" && apiKey.trim()) {
+      if (runtimeCredentialMode === "api" && apiKey.trim()) {
         apiKeyStored = await storeApiKeyUserSecret(createdCompanyId);
         if (!apiKeyStored) return;
       }
@@ -2833,6 +2853,27 @@ function OnboardingWizardInner({
               {/* Step 4: Connect a model — adapter + model + env check (capsule above) */}
               {step === 4 && (
                 <div className="space-y-8">
+                  {foundationCloudExecution && (
+                    <div className="rounded-xl border border-border bg-(--foundation-surface-subtle) p-4">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex items-start gap-3">
+                          <span className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-border bg-background text-muted-foreground">
+                            <Cloud className="size-4" />
+                          </span>
+                          <div>
+                            <p className="text-sm font-medium text-foreground">Foundation Cloud</p>
+                            <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                              El agente se ejecuta en un runtime aislado administrado por Foundation,
+                              no en este navegador ni en tu computadora.
+                            </p>
+                          </div>
+                        </div>
+                        <Badge variant={cloudRuntimeReady ? "secondary" : "outline"}>
+                          {cloudRuntimeReady ? "Runtime listo" : "Sin activar"}
+                        </Badge>
+                      </div>
+                    </div>
+                  )}
                   {/* The two cards are self-describing; an "Adapter type"
                       eyebrow above them named the mechanism rather than the
                       choice. */}
@@ -2866,7 +2907,7 @@ function OnboardingWizardInner({
                         label: MODEL_SOURCE_NAMES[opt.type] ?? opt.label,
                         icon: <ModelSourceMark type={opt.type} Fallback={opt.icon} />,
                       }))}
-                      mode={credentialMode}
+                      mode={runtimeCredentialMode}
                       selectedId={
                         sourcePicked &&
                         recommendedAdapters.some((opt) => opt.type === adapterType)
@@ -2897,12 +2938,20 @@ function OnboardingWizardInner({
                         what a sentence has to do where a checkbox does not —
                         and it is only readable because the tiles' own tags,
                         directly above, say where you are. */}
-                    <div className="-ml-3 mt-1">
-                      <CredentialModeLink
-                        mode={credentialMode}
-                        onChange={setCredentialMode}
-                      />
-                    </div>
+                    {!foundationCloudExecution && (
+                      <div className="-ml-3 mt-1">
+                        <CredentialModeLink
+                          mode={runtimeCredentialMode}
+                          onChange={setCredentialMode}
+                        />
+                      </div>
+                    )}
+                    {foundationCloudExecution && (
+                      <p className="mt-3 text-xs text-muted-foreground">
+                        Conecta una API key propia. Las suscripciones personales de Claude Code y
+                        Codex solo están disponibles en Foundation Desktop o en un runner propio.
+                      </p>
+                    )}
 
                   </div>
 
@@ -2919,9 +2968,9 @@ function OnboardingWizardInner({
                       swaps on. */}
                   <ConnectInputCanvas
                     open={canvasOpen}
-                    contentKey={`${adapterType}:${credentialMode}`}
+                    contentKey={`${adapterType}:${runtimeCredentialMode}`}
                   >
-                    {credentialMode === "api" ? (
+                    {runtimeCredentialMode === "api" ? (
                       <ApiKeyField
                         envKey={apiKeyEnvKeyFor(adapterType)}
                         value={apiKey}
@@ -2982,9 +3031,9 @@ function OnboardingWizardInner({
                          narrated a request the customer was not waiting on.
                          Neither survives a canvas that opens on a press. */
                       <p className="text-xs text-muted-foreground">
-                        A personal Claude or ChatGPT subscription cannot be transferred to this
-                        Foundation Cloud server. Use a signed-in local/private runner, or connect
-                        Foundation Cloud to a managed provider billed by usage.
+                        {foundationCloudExecution
+                          ? "Foundation Cloud todavía no tiene un runtime administrado activo para esta organización."
+                          : "Esta suscripción necesita un runtime local o remoto que pueda conservar su sesión."}
                       </p>
                     )}
                   </ConnectInputCanvas>

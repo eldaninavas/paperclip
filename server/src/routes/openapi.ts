@@ -1242,6 +1242,10 @@ registry.registerPath({
       // unavailable. Present on every response shape, including redacted ones.
       commit: z.string().nullable(),
       deploymentMode: z.string().optional(),
+      features: z.object({
+        companyDeletionEnabled: z.boolean().optional(),
+        foundationCloudExecutionEnabled: z.boolean().optional(),
+      }).strict().optional(),
       cloud: z.object({
         managed: z.literal(true),
         managedBy: z.literal("paperclip-cloud"),
