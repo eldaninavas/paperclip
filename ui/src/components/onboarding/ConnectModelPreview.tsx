@@ -106,7 +106,7 @@ export function ConnectModelPreview({
           <OnboardingHeading
             center
             title="Connect a model"
-            lede="Foundation works with your existing subscription or API keys."
+            lede="Use a subscription on a signed-in local runner, or a separately billed managed provider."
           />
         </div>
 

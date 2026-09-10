@@ -783,7 +783,7 @@ export function parsePaperclipRunnerStdoutLine(line: string, ts: string): Transc
 
 export const paperclipRunnerUIAdapter: UIAdapterModule = {
   type: "paperclip_runner",
-  label: "Foundation Runner",
+  label: "Foundation Managed Runner",
   parseStdoutLine: parsePaperclipRunnerStdoutLine,
   createStdoutParser: () => {
     let state = createParserState();

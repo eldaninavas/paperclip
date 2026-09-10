@@ -24,7 +24,7 @@ export type ModelSource = {
 };
 
 const CREDENTIAL_TAG_LABEL: Record<CredentialMode, string> = {
-  subscription: "Subscription",
+  subscription: "Local subscription",
   api: "API",
 };
 

@@ -154,6 +154,7 @@ export function AgentCharacter({
       viewBox="0 0 100 100"
       role="img"
       aria-label={`Agent identity, ${identity.shape} shape`}
+      data-agent-state={state}
       className={cn("overflow-visible", className)}
       animate={reducedMotion || !animated ? undefined : working
         ? { y: [0, -4, 0, -1, 0], rotate: [0, -3, 2, -1, 0], scale: [1, 1.035, 0.985, 1.015, 1] }
@@ -166,6 +167,57 @@ export function AgentCharacter({
           <stop offset="1" stopColor={stops[1]} />
         </linearGradient>
       </defs>
+      {state === "working" ? (
+        <g aria-hidden="true">
+          <motion.path
+            d="M19 67Q8 51 21 39"
+            fill="none"
+            stroke="var(--foreground)"
+            strokeWidth="3"
+            strokeLinecap="round"
+            opacity="0.7"
+            animate={reducedMotion || !animated ? undefined : { rotate: [2, -9, 2] }}
+            transition={{ duration: 0.8, repeat: Infinity, ease: "easeInOut" }}
+            style={{ transformOrigin: "19px 67px" }}
+          />
+          <motion.path
+            d="M81 67Q92 51 79 39"
+            fill="none"
+            stroke="var(--foreground)"
+            strokeWidth="3"
+            strokeLinecap="round"
+            opacity="0.7"
+            animate={reducedMotion || !animated ? undefined : { rotate: [-2, 9, -2] }}
+            transition={{ duration: 0.8, repeat: Infinity, ease: "easeInOut" }}
+            style={{ transformOrigin: "81px 67px" }}
+          />
+          {[
+            { cx: 22, cy: 22, delay: 0 },
+            { cx: 50, cy: 7, delay: 0.22 },
+            { cx: 78, cy: 22, delay: 0.44 },
+          ].map((orb) => (
+            <motion.circle
+              key={`${orb.cx}-${orb.cy}`}
+              cx={orb.cx}
+              cy={orb.cy}
+              r="4.5"
+              fill={stops[0]}
+              stroke="var(--background)"
+              strokeWidth="2"
+              animate={reducedMotion || !animated ? undefined : {
+                y: [0, -13, 0],
+                scale: [0.85, 1.15, 0.85],
+              }}
+              transition={{
+                duration: 0.9,
+                delay: orb.delay,
+                repeat: Infinity,
+                ease: "easeInOut",
+              }}
+            />
+          ))}
+        </g>
+      ) : null}
       <Body shape={identity.shape} fill={`url(#${gradientId})`} />
       <motion.g
         animate={reducedMotion || !animated

@@ -81,8 +81,8 @@ const adapterDisplayMap: Record<string, AdapterDisplayInfo> = {
     recommended: true,
   },
   paperclip_runner: {
-    label: "Foundation Runner",
-    description: "Experimental Rust runner with a Codex provider",
+    label: "Foundation Managed Runner",
+    description: "Managed remote runtime; model usage is billed separately",
     icon: Cpu,
     experimental: true,
   },

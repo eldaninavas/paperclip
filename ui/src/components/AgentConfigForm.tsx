@@ -1495,7 +1495,7 @@ export function AgentConfigForm(props: AgentConfigFormProps) {
                 <ConnectionModeCard
                   icon={Server}
                   title="Runner remoto"
-                  description="Ejecuta desde otro equipo autorizado."
+                  description="Ejecuta en Foundation Cloud o en otro equipo autorizado."
                   selected={connectionMode === "remote"}
                   disabled={!firstAvailableRemoteAdapter}
                   badge={!firstAvailableRemoteAdapter ? "Próximamente" : undefined}
@@ -1530,8 +1530,8 @@ export function AgentConfigForm(props: AgentConfigFormProps) {
                 </Field>
               ) : connectionMode === "remote" ? (
                 <Field
-                  label="Runner"
-                  hint="El trabajo se ejecuta fuera de este servidor y vuelve a Foundation para revisión humana."
+                  label="Runner remoto"
+                  hint="Foundation ejecuta el trabajo de forma aislada y devuelve actividad, entregables, coste y evidencia para revisión humana."
                 >
                   <AdapterTypeDropdown
                     value={adapterType}

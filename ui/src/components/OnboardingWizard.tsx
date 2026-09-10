@@ -1149,6 +1149,16 @@ function OnboardingWizardInner({
   const sourceSelected =
     sourcePicked && recommendedAdapters.some((opt) => opt.type === adapterType);
 
+  // A personal CLI subscription is a credential on a particular execution
+  // host. Cloud onboarding must not create an agent when there is no sandbox
+  // capable of performing and retaining that sign-in: doing so only defers the
+  // failure until the first message and misleadingly reports a connection.
+  const connectStepHasNoSandbox =
+    credentialMode !== "api" &&
+    experimentalSettingsForLogin?.enableManagedSandboxOnly === true &&
+    !canShowAdapterLogin &&
+    !authSignalUndecided;
+
   /**
    * Whether the connect step may advance.
    *
@@ -1167,7 +1177,10 @@ function OnboardingWizardInner({
    * once rather than twice.
    */
   const connectStepReady =
-    sourceSelected && !adapterEnvLoading && !missionUnresolvedForHire;
+    sourceSelected &&
+    !adapterEnvLoading &&
+    !missionUnresolvedForHire &&
+    !connectStepHasNoSandbox;
 
   /**
    * Whether this step has a sign-in to do before it can hire.
@@ -1246,9 +1259,6 @@ function OnboardingWizardInner({
    * yet — both were written for a canvas that opened on selection, and the
    * press is what opens it now.
    */
-  const connectStepHasNoSandbox =
-    credentialMode !== "api" && !canShowAdapterLogin && !authSignalUndecided;
-
   /**
    * Open once there is something in it: a key field, a sign-in that has been
    * started, or the news that no sign-in is possible.
@@ -2447,7 +2457,7 @@ function OnboardingWizardInner({
                       // sentence restating it only pushes the fields down.
                       lede={
                         step === 3 ? undefined : step === 4 ? (
-                          <>Foundation works with your subscription or API keys.</>
+                          <>Use a subscription on a signed-in local runner, or a separately billed managed provider.</>
                         ) : (
                           <>{agentName.trim() || "Your first agent"} is ready to work!</>
                         )
@@ -2972,7 +2982,9 @@ function OnboardingWizardInner({
                          narrated a request the customer was not waiting on.
                          Neither survives a canvas that opens on a press. */
                       <p className="text-xs text-muted-foreground">
-                        No managed sandbox is available to sign in against yet.
+                        A personal Claude or ChatGPT subscription cannot be transferred to this
+                        Foundation Cloud server. Use a signed-in local/private runner, or connect
+                        Foundation Cloud to a managed provider billed by usage.
                       </p>
                     )}
                   </ConnectInputCanvas>

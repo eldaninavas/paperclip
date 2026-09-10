@@ -75,24 +75,34 @@ export function TaskChatAgentIdentity({
   agentIcon,
   onBehalfOfUserName,
   status,
+  prominent = false,
 }: {
   agentName: string;
   agentIcon?: string | null;
   onBehalfOfUserName?: string;
   status?: string | null;
+  prominent?: boolean;
 }) {
   const hasCharacterIdentity = Boolean(parseAgentIdentity(agentIcon));
   return (
     <span
       className="flex items-center gap-1.5 px-1"
       data-testid="task-chat-agent-identity"
+      data-prominent={prominent ? "true" : undefined}
     >
       {hasCharacterIdentity ? (
         <span
-          className="flex size-6 shrink-0 items-center justify-center"
+          className={cn(
+            "flex shrink-0 items-center justify-center transition-[width,height]",
+            prominent ? "size-12" : "size-6",
+          )}
           data-testid="task-chat-agent-avatar"
         >
-          <AgentIcon icon={agentIcon} status={status} className="size-6" />
+          <AgentIcon
+            icon={agentIcon}
+            status={status}
+            className={prominent ? "size-11" : "size-6"}
+          />
         </span>
       ) : (
         <Avatar
@@ -109,7 +119,9 @@ export function TaskChatAgentIdentity({
           )}
         </Avatar>
       )}
-      <span className="text-xs font-medium text-foreground/90">{agentName}</span>
+      <span className={cn("font-medium text-foreground/90", prominent ? "text-sm" : "text-xs")}>
+        {agentName}
+      </span>
       {onBehalfOfUserName ? (
         <CommentAttributionChip
           agentName={agentName}

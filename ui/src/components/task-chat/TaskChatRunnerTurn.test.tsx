@@ -48,6 +48,7 @@ describe("TaskChatRunnerTurn", () => {
             <TaskChatRunnerTurn
               runId={runId}
               agentName="Runner"
+              agentIcon="agent:v1:triangle:orange:bright:none"
               items={items}
               status={status}
               startedAtMs={Date.now() - 2_000}
@@ -148,6 +149,19 @@ describe("TaskChatRunnerTurn", () => {
       container.querySelector('[data-testid="task-chat-turn-status-header"]')
         ?.textContent,
     ).toContain("Continued after steering · Working for");
+  });
+
+  it("shows the live agent prominently and animates in-progress statuses", () => {
+    render([], "in_progress");
+
+    expect(
+      container.querySelector('[data-testid="task-chat-agent-identity"]')
+        ?.getAttribute("data-prominent"),
+    ).toBe("true");
+    expect(
+      container.querySelector('[data-testid="task-chat-agent-avatar"] [data-agent-state]')
+        ?.getAttribute("data-agent-state"),
+    ).toBe("working");
   });
 
   it("renders completed progress exactly once when the live run returns to Thinking", () => {

@@ -518,7 +518,12 @@ export function TaskChatRunnerTurn({
         data-testid="task-chat-runner-identity-row"
       >
         {agentName ? (
-          <TaskChatAgentIdentity agentName={agentName} agentIcon={agentIcon} status={status} />
+          <TaskChatAgentIdentity
+            agentName={agentName}
+            agentIcon={agentIcon}
+            status={status}
+            prominent={!terminal}
+          />
         ) : null}
         <RunnerTurnStatus
           status={status}

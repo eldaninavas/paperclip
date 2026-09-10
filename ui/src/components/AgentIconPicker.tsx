@@ -21,11 +21,23 @@ import { getAgentIcon } from "../lib/agent-icons";
 const LEGACY_DEFAULT_ICON = "bot";
 
 function identityStateFromStatus(status: string | null | undefined) {
-  if (status === "running") return "working" as const;
-  if (status === "succeeded" || status === "completed" || status === "done") return "done" as const;
-  if (status === "paused") return "waiting" as const;
-  if (status === "error" || status === "failed" || status === "terminated") return "blocked" as const;
-  if (status === "pending_approval") return "thinking" as const;
+  const normalized = status?.trim().toLowerCase().replaceAll("-", "_");
+  if (
+    normalized === "running" ||
+    normalized === "working" ||
+    normalized === "in_progress" ||
+    normalized === "streaming"
+  ) return "working" as const;
+  if (
+    normalized === "queued" ||
+    normalized === "preparing" ||
+    normalized === "prepare_turn" ||
+    normalized === "thinking"
+  ) return "thinking" as const;
+  if (normalized === "succeeded" || normalized === "completed" || normalized === "done") return "done" as const;
+  if (normalized === "paused") return "waiting" as const;
+  if (normalized === "error" || normalized === "failed" || normalized === "terminated") return "blocked" as const;
+  if (normalized === "pending_approval") return "thinking" as const;
   return "idle" as const;
 }
 
