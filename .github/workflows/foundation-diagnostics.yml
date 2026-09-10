@@ -1,0 +1,37 @@
+name: Foundation diagnostics
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Environment to inspect
+        required: true
+        default: production
+        type: choice
+        options:
+          - development
+          - production
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    steps:
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: mx-central-1
+      - name: Inspect ECS service
+        env:
+          SERVICE: foundation-${{ inputs.environment == 'production' && 'prod' || 'dev' }}
+        run: |
+          aws ecs describe-services \
+            --region mx-central-1 \
+            --cluster foundation \
+            --services "$SERVICE" \
+            --query 'services[0].{desired:desiredCount,running:runningCount,pending:pendingCount,deployments:deployments[].{status:status,rollout:rolloutState,reason:rolloutStateReason,desired:desiredCount,running:runningCount,pending:pendingCount,failed:failedTasks,taskDefinition:taskDefinition},events:events[0:15].{at:createdAt,message:message}}' \
+            --output json
