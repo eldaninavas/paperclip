@@ -93,9 +93,9 @@ export function renderAssurancePdf(input: {
     const point = (sourceX: number, sourceY: number) =>
       `${pdfNumber(x + (sourceX - 50) * scale)} ${pdfNumber(top - (sourceY - 18) * scale)}`;
     const polygons = [
-      [[50, 73], [67, 59], [67, 142], [50, 128]],
-      [[76, 33], [95, 18], [95, 153], [76, 168]],
-      [[105, 38], [124, 53], [124, 119], [105, 134]],
+      [[50, 73], [68, 59], [68, 142.595], [50, 128]],
+      [[77, 33], [97, 18], [97, 149.892], [87, 158], [77, 149.892]],
+      [[106, 38], [124, 53], [124, 128], [106, 142.595]],
     ];
     for (const polygon of polygons) {
       const [first, ...rest] = polygon;

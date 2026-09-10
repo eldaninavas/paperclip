@@ -7,6 +7,6 @@
     <filter id="halo" x="-40%" y="-20%" width="180%" height="140%"><feGaussianBlur stdDeviation="2.4"/></filter>
   </defs>
   <rect width="192" height="192" rx="20" fill="#05090C"/>
-  <g opacity=".22" filter="url(#halo)" fill="none" stroke="#FFD7BA" stroke-width="3"><path d="M50 73 67 59 67 142 50 128Z"/><path d="M76 33 95 18 95 142 86 153 76 142Z"/><path d="M105 38 124 53 124 128 105 142Z"/></g>
-  <path d="M50 73 67 59 67 142 50 128Z" fill="url(#left)" stroke="#E8EDF0" stroke-width=".7"/><path d="M76 33 95 18 95 142 86 153 76 142Z" fill="url(#center)" stroke="#F4F5F4" stroke-width=".7"/><path d="M105 38 124 53 124 128 105 142Z" fill="url(#right)" stroke="#E8EDF0" stroke-width=".7"/>
+  <g opacity=".22" filter="url(#halo)" fill="none" stroke="#FFD7BA" stroke-width="3"><path d="M50 73 68 59 68 142.595 50 128Z"/><path d="M77 33 97 18 97 149.892 87 158 77 149.892Z"/><path d="M106 38 124 53 124 128 106 142.595Z"/></g>
+  <path d="M50 73 68 59 68 142.595 50 128Z" fill="url(#left)" stroke="#E8EDF0" stroke-width=".7"/><path d="M77 33 97 18 97 149.892 87 158 77 149.892Z" fill="url(#center)" stroke="#F4F5F4" stroke-width=".7"/><path d="M106 38 124 53 124 128 106 142.595Z" fill="url(#right)" stroke="#E8EDF0" stroke-width=".7"/>
 </svg>

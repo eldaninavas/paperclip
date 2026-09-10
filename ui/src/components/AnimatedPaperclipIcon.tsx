@@ -9,7 +9,7 @@ export function AnimatedPaperclipIcon({ className, ...props }: SVGProps<SVGSVGEl
       aria-hidden="true"
       {...props}
     >
-      <image href="/foundation-mark.svg?v=pillar-3" width="80" height="80" />
+      <image href="/foundation-mark.svg?v=pillar-4" width="80" height="80" />
     </svg>
   );
 }

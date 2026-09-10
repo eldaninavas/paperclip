@@ -22,7 +22,7 @@ export function PaperclipLockup({
       aria-label={decorative ? undefined : title}
       focusable="false"
     >
-      <image href="/foundation-mark.svg?v=pillar-3" x="0" y="0" width="32" height="32" />
+      <image href="/foundation-mark.svg?v=pillar-4" x="0" y="0" width="32" height="32" />
       <text
         x="42"
         y="22"

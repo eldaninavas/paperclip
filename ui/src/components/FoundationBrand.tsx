@@ -17,7 +17,7 @@ export function FoundationBrand({ compact = false, className }: FoundationBrandP
       )}
     >
       <span className="flex size-7 shrink-0 items-center justify-center" aria-hidden="true">
-        <img src="/foundation-mark.svg?v=pillar-3" alt="" className="size-6" />
+        <img src="/foundation-mark.svg?v=pillar-4" alt="" className="size-6" />
       </span>
       <span className={compact ? SIDEBAR_RAIL_HIDDEN_LABEL : "min-w-0 leading-none"}>
         <span className="block truncate text-(length:--text-compact) font-semibold tracking-tight">
