@@ -266,20 +266,20 @@ const OAUTH_PROVIDER_ERROR_MESSAGES: Record<string, string> = {
   account_selection_required: "The authorization server needs an account to be selected. Try connecting again.",
   consent_required: "The authorization server needs consent to be granted. Try connecting again.",
   interaction_required: "The authorization server needs to be signed in to interactively. Try connecting again.",
-  invalid_client: "The authorization server rejected Paperclip's OAuth client.",
-  invalid_client_metadata: "The authorization server rejected Paperclip's client registration details.",
+  invalid_client: "The authorization server rejected Foundation's OAuth client.",
+  invalid_client_metadata: "The authorization server rejected Foundation's client registration details.",
   invalid_grant: "The authorization server rejected the authorization code or refresh token.",
-  invalid_redirect_uri: "The authorization server rejected Paperclip's callback URL.",
+  invalid_redirect_uri: "The authorization server rejected Foundation's callback URL.",
   invalid_request: "The authorization server rejected the request as malformed.",
   invalid_scope: "The authorization server rejected the requested permissions.",
-  invalid_software_statement: "The authorization server rejected Paperclip's client registration details.",
+  invalid_software_statement: "The authorization server rejected Foundation's client registration details.",
   login_required: "The authorization server needs to be signed in to. Try connecting again.",
   server_error: "The authorization server reported an internal error. Try again shortly.",
   temporarily_unavailable: "The authorization server is temporarily unavailable. Try again shortly.",
-  unapproved_software_statement: "The authorization server rejected Paperclip's client registration details.",
-  unauthorized_client: "The authorization server refused to authorize Paperclip's OAuth client.",
-  unsupported_grant_type: "The authorization server does not support the grant Paperclip uses.",
-  unsupported_response_type: "The authorization server does not support the sign-in flow Paperclip uses.",
+  unapproved_software_statement: "The authorization server rejected Foundation's client registration details.",
+  unauthorized_client: "The authorization server refused to authorize Foundation's OAuth client.",
+  unsupported_grant_type: "The authorization server does not support the grant Foundation uses.",
+  unsupported_response_type: "The authorization server does not support the sign-in flow Foundation uses.",
 };
 
 /**
@@ -368,7 +368,7 @@ export function oauthClientIdMetadataDocument(input: {
 }): Record<string, unknown> {
   return {
     client_id: input.clientId,
-    client_name: `Paperclip (${new URL(input.redirectUri).host})`,
+    client_name: `Foundation by Davaria (${new URL(input.redirectUri).host})`,
     client_uri: new URL("/", input.clientId).toString(),
     redirect_uris: [input.redirectUri],
     grant_types: ["authorization_code", "refresh_token"],
@@ -599,7 +599,7 @@ const APPROVED_STDIO_TEMPLATES: Record<string, {
   tools: McpToolDescriptor[];
 }> = {
   "paperclip.echo-calculator-time": {
-    name: "Paperclip Echo / Calculator / Time fixture",
+    name: "Foundation Echo / Calculator / Time fixture",
     tools: [
       {
         name: "echo",
@@ -640,7 +640,7 @@ const APPROVED_STDIO_TEMPLATES: Record<string, {
     ],
   },
   "paperclip.synthetic-todo-kv": {
-    name: "Paperclip Synthetic Todo / KV fixture",
+    name: "Foundation Synthetic Todo / KV fixture",
     tools: [
       { name: "list_items", description: "List synthetic todo items.", annotations: { readOnlyHint: true } },
       { name: "create_item", description: "Create a synthetic todo item.", annotations: { readOnlyHint: false } },
@@ -772,13 +772,13 @@ const TOOL_EXAMPLES: ToolExampleDefinition[] = [
     title: "Safe read-only Todo / KV fixture",
     description: "Installs a deterministic local MCP fixture and grants only its read-only catalog entries.",
     applicationKey: "paperclip.examples.safe-read-only-todo-kv",
-    applicationName: "Paperclip example: Safe read-only Todo / KV",
+    applicationName: "Foundation example: Safe read-only Todo / KV",
     applicationDescription: "Deterministic MCP fixture for first-run tool governance checks.",
-    connectionName: "Paperclip example: Safe read-only Todo / KV",
+    connectionName: "Foundation example: Safe read-only Todo / KV",
     templateId: "paperclip.synthetic-todo-kv",
     profileKey: "paperclip.examples.safe-read-only-todo-kv.profile",
     profileName: "Example safe read-only tools",
-    profileDescription: "Allows only the read-only tools from the Paperclip Todo / KV example fixture.",
+    profileDescription: "Allows only the read-only tools from the Foundation Todo / KV example fixture.",
   },
 ];
 
@@ -2814,7 +2814,7 @@ export function toolAccessService(db: Db, options: ToolAccessServiceOptions = {}
       prompt: `Allow this agent to use your ${input.connection.name} account for autonomous runs`,
       acceptLabel: "Review delegation",
       rejectLabel: "Not now",
-      detailsMarkdown: "This autonomous run is paused. Paperclip will not use your personal identity until you explicitly delegate it to this named agent.",
+      detailsMarkdown: "This autonomous run is paused. Foundation will not use your personal identity until you explicitly delegate it to this named agent.",
       target: {
         type: "custom" as const,
         key: `connection:${input.connection.uid}:delegation:${input.ownerUserId}:${input.agentId}`,
@@ -3172,7 +3172,7 @@ export function toolAccessService(db: Db, options: ToolAccessServiceOptions = {}
         threshold: "Warning at >=3 timeouts and >=10% timeout rate in 1 hour; critical at >=10 timeouts or >=25%.",
         observed: `${input.timeoutCount} timeout(s), ${input.timeoutRate}% timeout rate.`,
         description: "Tool gateway calls are timing out or being runtime-deferred at an elevated rate.",
-        firstResponderAction: "Check upstream MCP health, Paperclip runtime capacity, and recent gateway audit failures before retrying workloads.",
+        firstResponderAction: "Check upstream MCP health, Foundation runtime capacity, and recent gateway audit failures before retrying workloads.",
         runbookSection,
       }),
       runtimeAlert({
@@ -6948,7 +6948,7 @@ export function toolAccessService(db: Db, options: ToolAccessServiceOptions = {}
 
     const host = new URL(input.redirectUri).host;
     const requestedMetadata = {
-      client_name: `Paperclip (${host})`,
+      client_name: `Foundation by Davaria (${host})`,
       redirect_uris: [input.redirectUri],
       grant_types: [
         "authorization_code",
@@ -8518,7 +8518,7 @@ export function toolAccessService(db: Db, options: ToolAccessServiceOptions = {}
     if (credentialSource === "vercel_connect") {
       const integration = vercelConnectIntegrationStatus();
       if (!integration.enabled || !integration.configured || !vercelConnect) {
-        throw unprocessable("Vercel Connect setup is not available on this Paperclip instance", {
+        throw unprocessable("Vercel Connect setup is not available on this Foundation instance", {
           code: "vercel_connect_unavailable",
         });
       }
@@ -8560,7 +8560,7 @@ export function toolAccessService(db: Db, options: ToolAccessServiceOptions = {}
           ...(retainedConnection ? [ne(toolConnections.id, retainedConnection.id)] : []),
         )).limit(1);
         if (connectorInUse) {
-          throw conflict("App-subject Vercel connectors are dedicated to one Paperclip connection. Create or attach a separate connector in Vercel.", {
+          throw conflict("App-subject Vercel connectors are dedicated to one Foundation connection. Create or attach a separate connector in Vercel.", {
             code: "vercel_connect_app_connector_in_use",
           });
         }
@@ -8869,7 +8869,7 @@ export function toolAccessService(db: Db, options: ToolAccessServiceOptions = {}
           }
         }
         if (!applicationRow) {
-          throw conflict("Paperclip could not allocate a unique connection name", {
+          throw conflict("Foundation could not allocate a unique connection name", {
             code: "tool_access_name_allocation_exhausted",
           });
         }
@@ -9518,7 +9518,7 @@ export function toolAccessService(db: Db, options: ToolAccessServiceOptions = {}
     const connection = await getConnectionRow(connectionId, companyId);
     if (connection.status === "archived") throw conflict("Archived app connections cannot be reconnected");
     if (connection.credentialSource === "vercel_connect") {
-      throw conflict("Manage this connector in Vercel Connect, then run a Paperclip health check to verify it.", {
+      throw conflict("Manage this connector in Vercel Connect, then run a Foundation health check to verify it.", {
         code: "vercel_connect_managed_externally",
         manageUrl: vercelConnectIntegrationStatus().manageUrl,
       });
@@ -9773,7 +9773,7 @@ export function toolAccessService(db: Db, options: ToolAccessServiceOptions = {}
       const providerName = galleryEntry?.name ?? "Google Workspace";
       const cloudConnector = currentCloudConnector();
       if (!cloudConnector) {
-        throw unprocessable(`${providerName} connections through Paperclip are not available on this instance yet`, {
+        throw unprocessable(`${providerName} connections through Foundation are not available on this instance yet`, {
           code: "paperclip_cloud_connector_unavailable",
         });
       }
@@ -10227,7 +10227,7 @@ export function toolAccessService(db: Db, options: ToolAccessServiceOptions = {}
     if (!input.claimId) throw badRequest(`${providerName} callback is missing a claim identifier`);
     const cloudConnector = currentCloudConnector();
     if (!cloudConnector) {
-      throw unprocessable(`${providerName} connections through Paperclip are not available on this instance yet`, {
+      throw unprocessable(`${providerName} connections through Foundation are not available on this instance yet`, {
         code: "paperclip_cloud_connector_unavailable",
       });
     }
@@ -13611,7 +13611,7 @@ export function toolAccessService(db: Db, options: ToolAccessServiceOptions = {}
         if (typeof server.url === "string" || typeof server.endpoint === "string") {
           const headers = asRecord(server.headers);
           const credentialFields = Object.keys(headers).sort().map((key) => {
-            warnings.push(`Header ${key} will be stored as a Paperclip secret before activation.`);
+            warnings.push(`Header ${key} will be stored as a Foundation secret before activation.`);
             return {
               configPath: `headers.${key}`,
               label: key,
@@ -13632,7 +13632,7 @@ export function toolAccessService(db: Db, options: ToolAccessServiceOptions = {}
           };
         }
         if (typeof server.command === "string") {
-          warnings.push("Imported stdio commands stay draft-only unless mapped to an approved Paperclip template.");
+          warnings.push("Imported stdio commands stay draft-only unless mapped to an approved Foundation template.");
           return {
             name,
             transport: "local_stdio" as const,

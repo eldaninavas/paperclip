@@ -1989,7 +1989,7 @@ export function agentRoutes(
       const experimental = await instanceSettings.getExperimental();
       if (experimental.enableNativeRunner !== true) {
         throw unprocessable(
-          "Paperclip Runner is experimental and disabled on this instance.",
+          "Foundation Runner is experimental and disabled on this instance.",
           { code: "paperclip_runner_rollout_disabled" },
         );
       }
@@ -2049,7 +2049,7 @@ export function agentRoutes(
     }
     if (input.previousAdapterType !== "codex_local") {
       throw unprocessable(
-        `Cannot convert ${input.previousAdapterType} to Paperclip Runner while only the Codex provider is available.`,
+        `Cannot convert ${input.previousAdapterType} to Foundation Runner while only the Codex provider is available.`,
         { code: "paperclip_runner_adapter_conversion_unsupported" },
       );
     }

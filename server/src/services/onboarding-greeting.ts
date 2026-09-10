@@ -17,8 +17,8 @@ export function buildOnboardingGreeting(input: {
   // it, so the first message reads as coming from *their* first teammate rather
   // than a generic agent. Fall back to the generic phrasing otherwise.
   const identity = agentName
-    ? `Welcome! I'm ${agentName}, your first agent teammate on Paperclip.`
-    : "Welcome! I'm your first agent teammate on Paperclip.";
+    ? `Welcome! I'm ${agentName}, your first agent teammate in Foundation.`
+    : "Welcome! I'm your first agent teammate in Foundation.";
 
   const lines: string[] = [];
   lines.push(identity);

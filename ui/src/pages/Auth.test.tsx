@@ -114,6 +114,19 @@ describe("AuthPage", () => {
     return { root, queryClient };
   }
 
+  it("presents only Foundation by Davaria branding", async () => {
+    const { root } = await mount();
+
+    expect(container.textContent).toContain("Foundation");
+    expect(container.textContent).toContain("DAVARIA");
+    expect(container.textContent).not.toContain("Paperclip");
+    expect(container.querySelector('[aria-label="Foundation by Davaria"]')).not.toBeNull();
+
+    await act(async () => {
+      root.unmount();
+    });
+  });
+
   it("exposes password-manager metadata and a11y attributes on the sign-in form", async () => {
     const { root } = await mount();
 

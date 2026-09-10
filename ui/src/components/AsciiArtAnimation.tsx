@@ -4,32 +4,32 @@ const CHARS = [" ", ".", "·", "▪", "▫", "○"] as const;
 const TARGET_FPS = 24;
 const FRAME_INTERVAL_MS = 1000 / TARGET_FPS;
 
-const PAPERCLIP_SPRITES = [
+const FOUNDATION_MARK_SPRITES = [
   [
-    "  ╭────╮ ",
-    " ╭╯╭──╮│ ",
-    " │ │  ││ ",
-    " │ │  ││ ",
-    " │ │  ││ ",
-    " │ │  ││ ",
-    " │ ╰──╯│ ",
-    " ╰─────╯ ",
+    "     ▟█      ",
+    "    ▟██  ▟   ",
+    "    ███ ▟█   ",
+    " ▟█ ███ ██   ",
+    "███ ███ ██   ",
+    "███ ███ ██   ",
+    "███ ███ ██   ",
+    "▜██ ▜██▙▜█   ",
   ],
   [
-    " ╭─────╮ ",
-    " │╭──╮╰╮ ",
-    " ││  │ │ ",
-    " ││  │ │ ",
-    " ││  │ │ ",
-    " ││  │ │ ",
-    " │╰──╯ │ ",
-    " ╰────╯  ",
+    "     ▞█      ",
+    "    ▞██  ▞   ",
+    "    ███ ▞█   ",
+    " ▞█ ███ ██   ",
+    "███ ███ ██   ",
+    "███ ███ ██   ",
+    "███ ███ ██   ",
+    "▚██ ▚██▙▚█   ",
   ],
 ] as const;
 
-type PaperclipSprite = (typeof PAPERCLIP_SPRITES)[number];
+type FoundationMarkSprite = (typeof FOUNDATION_MARK_SPRITES)[number];
 
-interface Clip {
+interface FloatingMark {
   x: number;
   y: number;
   vx: number;
@@ -37,7 +37,7 @@ interface Clip {
   life: number;
   maxLife: number;
   drift: number;
-  sprite: PaperclipSprite;
+  sprite: FoundationMarkSprite;
   width: number;
   height: number;
 }
@@ -53,7 +53,7 @@ function measureChar(container: HTMLElement): { w: number; h: number } {
   return { w: rect.width, h: rect.height };
 }
 
-function spriteSize(sprite: PaperclipSprite): { width: number; height: number } {
+function spriteSize(sprite: FoundationMarkSprite): { width: number; height: number } {
   let width = 0;
   for (const row of sprite) width = Math.max(width, row.length);
   return { width, height: sprite.length };
@@ -78,8 +78,8 @@ export function AsciiArtAnimation() {
     let trail = new Float32Array(0);
     let colWave = new Float32Array(0);
     let rowWave = new Float32Array(0);
-    let clipMask = new Uint16Array(0);
-    let clips: Clip[] = [];
+    let markMask = new Uint16Array(0);
+    let marks: FloatingMark[] = [];
     let lastOutput = "";
 
     function toGlyph(value: number): string {
@@ -99,13 +99,13 @@ export function AsciiArtAnimation() {
       trail = new Float32Array(cellCount);
       colWave = new Float32Array(cols);
       rowWave = new Float32Array(rows);
-      clipMask = new Uint16Array(cellCount);
-      clips = clips.filter((clip) => {
+      markMask = new Uint16Array(cellCount);
+      marks = marks.filter((mark) => {
         return (
-          clip.x > -clip.width - 2 &&
-          clip.x < cols + 2 &&
-          clip.y > -clip.height - 2 &&
-          clip.y < rows + 2
+          mark.x > -mark.width - 2 &&
+          mark.x < cols + 2 &&
+          mark.y > -mark.height - 2 &&
+          mark.y < rows + 2
         );
       });
       lastOutput = "";
@@ -130,7 +130,7 @@ export function AsciiArtAnimation() {
       for (let baseRow = 1; baseRow < rows - 9; baseRow += gapY) {
         const startX = Math.floor(baseRow / gapY) % 2 === 0 ? 2 : 10;
         for (let baseCol = startX; baseCol < cols - 10; baseCol += gapX) {
-          const sprite = PAPERCLIP_SPRITES[(baseCol + baseRow) % PAPERCLIP_SPRITES.length]!;
+          const sprite = FOUNDATION_MARK_SPRITES[(baseCol + baseRow) % FOUNDATION_MARK_SPRITES.length]!;
           for (let sr = 0; sr < sprite.length; sr++) {
             const line = sprite[sr]!;
             for (let sc = 0; sc < line.length; sc++) {
@@ -150,8 +150,8 @@ export function AsciiArtAnimation() {
       lastOutput = output;
     }
 
-    function spawnClip() {
-      const sprite = PAPERCLIP_SPRITES[Math.floor(Math.random() * PAPERCLIP_SPRITES.length)]!;
+    function spawnMark() {
+      const sprite = FOUNDATION_MARK_SPRITES[Math.floor(Math.random() * FOUNDATION_MARK_SPRITES.length)]!;
       const size = spriteSize(sprite);
       const edge = Math.random();
       let x = 0;
@@ -171,7 +171,7 @@ export function AsciiArtAnimation() {
         vy = y < 0 ? 0.028 + Math.random() * 0.034 : -(0.028 + Math.random() * 0.034);
       }
 
-      clips.push({
+      marks.push({
         x,
         y,
         vx,
@@ -185,11 +185,11 @@ export function AsciiArtAnimation() {
       });
     }
 
-    function stampClip(clip: Clip, alpha: number) {
-      const baseCol = Math.round(clip.x);
-      const baseRow = Math.round(clip.y);
-      for (let sr = 0; sr < clip.sprite.length; sr++) {
-        const line = clip.sprite[sr]!;
+    function stampMark(mark: FloatingMark, alpha: number) {
+      const baseCol = Math.round(mark.x);
+      const baseRow = Math.round(mark.y);
+      for (let sr = 0; sr < mark.sprite.length; sr++) {
+        const line = mark.sprite[sr]!;
         const row = baseRow + sr;
         if (row < 0 || row >= rows) continue;
         for (let sc = 0; sc < line.length; sc++) {
@@ -198,9 +198,8 @@ export function AsciiArtAnimation() {
           const col = baseCol + sc;
           if (col < 0 || col >= cols) continue;
           const idx = row * cols + col;
-          const stroke = ch === "│" || ch === "─" ? 0.8 : 0.92;
-          trail[idx] = Math.max(trail[idx] ?? 0, alpha * stroke);
-          clipMask[idx] = ch.charCodeAt(0);
+          trail[idx] = Math.max(trail[idx] ?? 0, alpha * 0.92);
+          markMask[idx] = ch.charCodeAt(0);
         }
       }
     }
@@ -216,37 +215,37 @@ export function AsciiArtAnimation() {
 
       const cellCount = cols * rows;
       const targetCount = Math.max(3, Math.floor(cellCount / 2200));
-      while (clips.length < targetCount) spawnClip();
+      while (marks.length < targetCount) spawnMark();
 
       for (let i = 0; i < trail.length; i++) trail[i] *= 0.92;
-      clipMask.fill(0);
+      markMask.fill(0);
 
-      for (let i = clips.length - 1; i >= 0; i--) {
-        const clip = clips[i]!;
-        clip.life += delta;
+      for (let i = marks.length - 1; i >= 0; i--) {
+        const mark = marks[i]!;
+        mark.life += delta;
 
-        const wobbleX = Math.sin((clip.y + clip.drift + tick * 0.12) * 0.09) * 0.0018;
-        const wobbleY = Math.cos((clip.x - clip.drift - tick * 0.09) * 0.08) * 0.0014;
-        clip.vx = (clip.vx + wobbleX) * 0.998;
-        clip.vy = (clip.vy + wobbleY) * 0.998;
+        const wobbleX = Math.sin((mark.y + mark.drift + tick * 0.12) * 0.09) * 0.0018;
+        const wobbleY = Math.cos((mark.x - mark.drift - tick * 0.09) * 0.08) * 0.0014;
+        mark.vx = (mark.vx + wobbleX) * 0.998;
+        mark.vy = (mark.vy + wobbleY) * 0.998;
 
-        clip.x += clip.vx * delta;
-        clip.y += clip.vy * delta;
+        mark.x += mark.vx * delta;
+        mark.y += mark.vy * delta;
 
         if (
-          clip.life >= clip.maxLife ||
-          clip.x < -clip.width - 2 ||
-          clip.x > cols + 2 ||
-          clip.y < -clip.height - 2 ||
-          clip.y > rows + 2
+          mark.life >= mark.maxLife ||
+          mark.x < -mark.width - 2 ||
+          mark.x > cols + 2 ||
+          mark.y < -mark.height - 2 ||
+          mark.y > rows + 2
         ) {
-          clips.splice(i, 1);
+          marks.splice(i, 1);
           continue;
         }
 
-        const life = clip.life / clip.maxLife;
+        const life = mark.life / mark.maxLife;
         const alpha = life < 0.12 ? life / 0.12 : life > 0.88 ? (1 - life) / 0.12 : 1;
-        stampClip(clip, alpha);
+        stampMark(mark, alpha);
       }
 
       for (let c = 0; c < cols; c++) colWave[c] = Math.sin(c * 0.08 + tick * 0.06);
@@ -256,9 +255,9 @@ export function AsciiArtAnimation() {
       for (let r = 0; r < rows; r++) {
         for (let c = 0; c < cols; c++) {
           const idx = r * cols + c;
-          const clipChar = clipMask[idx];
-          if (clipChar > 0) {
-            output += String.fromCharCode(clipChar);
+          const markChar = markMask[idx];
+          if (markChar > 0) {
+            output += String.fromCharCode(markChar);
             continue;
           }
           const ambient = (colWave[c] + rowWave[r]) * 0.08 + 0.1;

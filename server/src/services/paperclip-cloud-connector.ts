@@ -127,7 +127,7 @@ export function paperclipCloudConnectorConfigFromEnv(
   const hasActiveLocalIdentity = localIdentity?.status === "active" && localStatus?.configured === true;
   if (!hasManagedIdentityOverride && !hasActiveLocalIdentity && legacyConfigured) {
     throw new PaperclipCloudConnectorError(
-      "Paperclip ID connector settings use an incompatible legacy protocol; enroll this instance with Paperclip Cloud",
+      "Legacy connector settings use an incompatible protocol; enroll this instance with Foundation Cloud",
       "CONNECTOR_MIGRATION_REQUIRED",
     );
   }
@@ -158,7 +158,7 @@ export function paperclipCloudConnectorConfigFromEnv(
   if ((brokerHost === "my.paperclip.app" && environment !== "production")
     || (brokerHost === "my-staging.paperclip.app" && environment !== "staging")) {
     throw new PaperclipCloudConnectorError(
-      "Paperclip Cloud connector broker and environment do not match",
+      "Foundation Cloud connector broker and environment do not match",
       "CONNECTOR_CONFIG_INVALID",
     );
   }
@@ -229,7 +229,7 @@ export function createPaperclipCloudConnector(input: {
     if (operation === "revoke" && response.status === 204) return {};
     if (!response.ok) {
       throw new PaperclipCloudConnectorError(
-        "Paperclip Cloud connector rejected the request",
+        "Foundation Cloud connector rejected the request",
         response.status === 409 ? "REAUTHORIZATION_REQUIRED" : "CONNECTOR_REQUEST_FAILED",
         response.status,
       );

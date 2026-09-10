@@ -738,8 +738,8 @@ const BUILTIN_TOOLS: ToolGatewayDescriptor[] = [
   },
   {
     name: "paperclip-self:list_my_issues",
-    displayName: "List my Paperclip issues",
-    description: "Paperclip self-MCP read fixture that lists the authenticated agent's current issues.",
+    displayName: "List my Foundation issues",
+    description: "Foundation self-MCP read fixture that lists the authenticated agent's current issues.",
     parametersSchema: {
       type: "object",
       properties: { limit: { type: "number" } },
@@ -752,7 +752,7 @@ const BUILTIN_TOOLS: ToolGatewayDescriptor[] = [
   {
     name: "paperclip-self:get_issue_context",
     displayName: "Get issue context",
-    description: "Paperclip self-MCP read fixture that returns scoped issue context and plan document metadata.",
+    description: "Foundation self-MCP read fixture that returns scoped issue context and plan document metadata.",
     parametersSchema: {
       type: "object",
       properties: { issueId: { type: "string" } },
@@ -793,7 +793,7 @@ const BUILTIN_TOOLS: ToolGatewayDescriptor[] = [
 const VIRTUAL_SEARCH_TOOLS: ToolGatewayDescriptor = {
   name: "search_tools",
   displayName: "Search available tools",
-  description: "Search the tools available through this Paperclip gateway without loading every target tool into the tool list.",
+  description: "Search the tools available through this Foundation gateway without loading every target tool into the tool list.",
   parametersSchema: {
     type: "object",
     properties: {
@@ -810,7 +810,7 @@ const VIRTUAL_SEARCH_TOOLS: ToolGatewayDescriptor = {
 const VIRTUAL_RUN_TOOL: ToolGatewayDescriptor = {
   name: "run_tool",
   displayName: "Run a selected tool",
-  description: "Run a target tool by name after Paperclip applies the target tool's profile, policy, approval, and rate-limit checks.",
+  description: "Run a target tool by name after Foundation applies the target tool's profile, policy, approval, and rate-limit checks.",
   parametersSchema: {
     type: "object",
     properties: {
@@ -1796,7 +1796,7 @@ export function createToolGatewayService(
         kind: "request_confirmation",
         idempotencyKey: `tool-action:${actionRequest.id}`,
         title: "Approve tool action",
-        summary: `${input.tool.name} requires approval before Paperclip will execute it.`,
+        summary: `${input.tool.name} requires approval before Foundation will execute it.`,
         continuationPolicy: "wake_assignee",
         payload: {
           version: 1,
@@ -2156,7 +2156,7 @@ export function createToolGatewayService(
 
     if (tool.name === "paperclip-self:list_my_issues") {
       if (!session.agentId) {
-        throw new ToolGatewayHttpError(403, "Paperclip self tools require an agent-scoped gateway session", "agent_context_required");
+        throw new ToolGatewayHttpError(403, "Foundation self tools require an agent-scoped gateway session", "agent_context_required");
       }
       const limit = Math.max(1, Math.min(50, Number(params.limit ?? 10) || 10));
       const rows = await db
@@ -2180,7 +2180,7 @@ export function createToolGatewayService(
 
     if (tool.name === "paperclip-self:get_issue_context") {
       if (!session.agentId) {
-        throw new ToolGatewayHttpError(403, "Paperclip self tools require an agent-scoped gateway session", "agent_context_required");
+        throw new ToolGatewayHttpError(403, "Foundation self tools require an agent-scoped gateway session", "agent_context_required");
       }
       const issueId = typeof params.issueId === "string" ? params.issueId : session.issueId;
       if (!issueId) {
@@ -2671,7 +2671,7 @@ export function createToolGatewayService(
       // and provider reconnect instead of sending it to the wrong client.
       await db.update(connectionGrants).set({ status: "needs_reauthorization", updatedAt: new Date(currentTime) })
         .where(eq(connectionGrants.id, grant.id));
-      throw new ToolGatewayHttpError(409, "Legacy Google authorization must be reconnected through Paperclip Cloud", "google_reauthorization_required", {
+      throw new ToolGatewayHttpError(409, "Legacy Google authorization must be reconnected through Foundation Cloud", "google_reauthorization_required", {
         connectionId: connection.id,
         grantId: grant.id,
       });
@@ -3037,7 +3037,7 @@ export function createToolGatewayService(
       rejectLabel: "Not now",
       detailsMarkdown: grantKind === "organization"
         ? "Vercel Connect reports that the shared organization identity needs authorization."
-        : "This run needs your personal authorization. Paperclip will not use another user's identity.",
+        : "This run needs your personal authorization. Foundation will not use another user's identity.",
       target: {
         type: "custom" as const,
         key: `connection:${connection.uid}:user:${userId}`,
@@ -3104,7 +3104,7 @@ export function createToolGatewayService(
       prompt: `Allow this agent to use your ${connection.name} account for autonomous runs`,
       acceptLabel: "Review delegation",
       rejectLabel: "Not now",
-      detailsMarkdown: "This autonomous run is paused. Paperclip will not use your personal identity until you explicitly delegate it to this named agent.",
+      detailsMarkdown: "This autonomous run is paused. Foundation will not use your personal identity until you explicitly delegate it to this named agent.",
       target: {
         type: "custom" as const,
         key: `connection:${connection.uid}:delegation:${userId}:${session.agentId}`,
@@ -3996,7 +3996,7 @@ export function createToolGatewayService(
       .set({
         status: "awaiting_approval",
         errorCode: "elicitation_required",
-        errorMessage: "Remote MCP tool requested elicitation; Paperclip created an issue interaction for the response.",
+        errorMessage: "Remote MCP tool requested elicitation; Foundation created an issue interaction for the response.",
         updatedAt: now,
       })
       .where(eq(toolInvocations.id, input.invocationId));
@@ -4386,7 +4386,7 @@ export function createToolGatewayService(
         client: "cursor",
         label: "Cursor",
         config: { mcpServers: { [gateway.name]: { url: endpoint, headers: { Authorization: `Bearer ${bearerPlaceholder}` } } } },
-        notes: ["Use the full Paperclip origin before the endpoint path."],
+        notes: ["Use the full Foundation origin before the endpoint path."],
       },
       {
         client: "claude_desktop",
@@ -4410,7 +4410,7 @@ export function createToolGatewayService(
         client: "opencode",
         label: "OpenCode",
         config: { mcp: { [gateway.name]: { url: endpoint, headers: { Authorization: `Bearer ${bearerPlaceholder}` } } } },
-        notes: ["Use the full Paperclip origin before the endpoint path."],
+        notes: ["Use the full Foundation origin before the endpoint path."],
       },
     ];
   }

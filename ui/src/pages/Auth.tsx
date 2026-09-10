@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { AsciiArtAnimation } from "@/components/AsciiArtAnimation";
 import { PaperclipLoading } from "@/components/AnimatedPaperclipIcon";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { PaperclipLockup } from "../components/PaperclipLockup";
+import { FoundationLockup } from "../components/FoundationLockup";
 
 type AuthMode = "sign_in" | "sign_up";
 
@@ -89,7 +89,7 @@ export function AuthPage() {
       <div className="w-full md:w-1/2 flex flex-col overflow-y-auto">
         <div className="w-full max-w-md mx-auto my-auto px-8 py-12">
           <div className="mb-8">
-            <PaperclipLockup className="h-5 w-auto" />
+            <FoundationLockup className="h-8 w-auto" />
           </div>
 
           <h1 className="text-xl font-semibold">
