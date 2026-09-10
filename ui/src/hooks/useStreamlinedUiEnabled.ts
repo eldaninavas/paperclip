@@ -31,6 +31,11 @@ export function useStreamlinedUiEnabled(): { enabled: boolean; loaded: boolean }
       queryKey: queryKeys.instance.experimentalSettings,
       queryFn: () => instanceSettingsApi.getExperimental(),
       enabled: contextClient != null,
+      // This preference is protected in authenticated deployments. On a
+      // freshly reset instance there is deliberately no application session
+      // yet, so retrying it only delays the auth/bootstrap gate that can create
+      // that session.
+      retry: false,
     },
     contextClient ?? getDetachedClient(),
   );
@@ -39,6 +44,11 @@ export function useStreamlinedUiEnabled(): { enabled: boolean; loaded: boolean }
 
   return {
     enabled: resolveStreamlinedUiEnabled(query.data),
-    loaded: query.isFetched,
+    // The streamlined shell is already the safe default. Do not hold the
+    // entire router behind this optional preference request: after a factory
+    // reset that request can be unauthorized (or be interrupted during a
+    // rollout), and the user must still reach auth/bootstrap instead of an
+    // infinite brand-loader. An explicit false is applied as soon as it loads.
+    loaded: true,
   };
 }

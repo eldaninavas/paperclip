@@ -46,7 +46,7 @@ describe("useStreamlinedUiEnabled", () => {
     vi.clearAllMocks();
   });
 
-  it("fails open for missing settings and loading state", () => {
+  it("fails open immediately for missing settings and a request that never settles", () => {
     expect(resolveStreamlinedUiEnabled(undefined)).toBe(true);
     expect(resolveStreamlinedUiEnabled(null)).toBe(true);
 
@@ -60,7 +60,7 @@ describe("useStreamlinedUiEnabled", () => {
       );
     });
 
-    expect(host.textContent).toBe("true:false");
+    expect(host.textContent).toBe("true:true");
   });
 
   it("uses the legacy shell only for an explicit false value", async () => {
