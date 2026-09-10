@@ -28,16 +28,19 @@ jobs:
       - name: Inspect ECS service
         env:
           SERVICE: foundation-${{ inputs.environment == 'production' && 'prod' || 'dev' }}
-          TARGET_GROUP: ${{ vars.AWS_TARGET_GROUP_ARN }}
         run: |
-          aws ecs describe-services \
+          SERVICE_JSON=$(aws ecs describe-services \
             --region mx-central-1 \
             --cluster foundation \
             --services "$SERVICE" \
-            --query 'services[0].{desired:desiredCount,running:runningCount,pending:pendingCount,deployments:deployments[].{status:status,rollout:rolloutState,reason:rolloutStateReason,desired:desiredCount,running:runningCount,pending:pendingCount,failed:failedTasks,taskDefinition:taskDefinition},events:events[0:15].{at:createdAt,message:message}}' \
-            --output json
-          aws elbv2 describe-target-health \
-            --region mx-central-1 \
-            --target-group-arn "$TARGET_GROUP" \
-            --query 'TargetHealthDescriptions[].{target:Target.Id,port:Target.Port,state:TargetHealth.State,reason:TargetHealth.Reason,description:TargetHealth.Description}' \
-            --output json
+            --output json)
+          echo "$SERVICE_JSON" | jq '.services[0] | {desired: .desiredCount, running: .runningCount, pending: .pendingCount, deployments: [.deployments[] | {status, rollout: .rolloutState, reason: .rolloutStateReason, desired: .desiredCount, running: .runningCount, pending: .pendingCount, failed: .failedTasks, taskDefinition}], events: [.events[0:15][] | {at: .createdAt, message}]}'
+          TARGET_GROUP=$(echo "$SERVICE_JSON" | jq -r '.services[0].loadBalancers[0].targetGroupArn')
+          for attempt in {1..18}; do
+            aws elbv2 describe-target-health \
+              --region mx-central-1 \
+              --target-group-arn "$TARGET_GROUP" \
+              --query 'TargetHealthDescriptions[].{target:Target.Id,port:Target.Port,state:TargetHealth.State,reason:TargetHealth.Reason,description:TargetHealth.Description}' \
+              --output json
+            sleep 10
+          done
