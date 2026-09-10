@@ -23,6 +23,7 @@ import { assuranceDossierService } from "../services/assurance/dossiers.js";
 import { validateAssuranceTask } from "../services/assurance/task-validator.js";
 import { verifyPublicAssurance } from "../services/assurance/verification.js";
 import { canonicalizeAssuranceJson } from "../services/assurance/canonicalizer.js";
+import { renderAssurancePdf } from "../services/assurance/renderers.js";
 import { renderAssuranceQrSvg } from "../services/assurance/qr.js";
 
 const PUBLIC_LIMIT_WINDOW_MS = 60_000;
@@ -62,6 +63,12 @@ function actor(req: Request) {
     id: info.actorId,
     agentId: info.agentId,
   };
+}
+
+function record(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
 }
 
 function assuranceError(res: Response, error: unknown) {
@@ -267,19 +274,23 @@ export function assuranceRoutes(db: Db, storage: StorageService) {
       eq(assuranceDossierVersions.companyId, dossier.companyId),
       eq(assuranceDossierVersions.dossierId, dossier.id),
     )).orderBy(desc(assuranceDossierVersions.version)).limit(1).then((rows) => rows[0] ?? null);
-    if (!version) res.status(404).json({ error: "No sealed Assurance version exists" });
-    return version;
+    if (!version) {
+      res.status(404).json({ error: "No sealed Assurance version exists" });
+      return null;
+    }
+    return { dossier, version };
   }
 
   router.get("/assurance/dossiers/:dossierId/manifest", async (req, res) => {
-    const version = await latestVersion(req, res);
-    if (!version) return;
-    res.type("application/json").send(canonicalizeAssuranceJson(version.manifestJson));
+    const context = await latestVersion(req, res);
+    if (!context) return;
+    res.type("application/json").send(canonicalizeAssuranceJson(context.version.manifestJson));
   });
 
   async function sendVersionAsset(req: Request, res: Response, field: "xmlAssetId" | "pdfAssetId" | "bundleAssetId", downloadName: string) {
-    const version = await latestVersion(req, res);
-    if (!version) return;
+    const context = await latestVersion(req, res);
+    if (!context) return;
+    const { version } = context;
     const assetId = version[field];
     if (!assetId) return res.status(404).json({ error: "Assurance artifact not available" });
     const asset = await db.select().from(assets).where(and(eq(assets.id, assetId), eq(assets.companyId, version.companyId))).limit(1).then((rows) => rows[0] ?? null);
@@ -291,8 +302,66 @@ export function assuranceRoutes(db: Db, storage: StorageService) {
     object.stream.pipe(res);
   }
 
+  async function sendCurrentPdf(req: Request, res: Response) {
+    const context = await latestVersion(req, res);
+    if (!context) return;
+    const { dossier, version } = context;
+    const details = await dossiers.detail(dossier.companyId, dossier.id);
+    if (!details) return res.status(404).json({ error: "Assurance dossier not found" });
+
+    const manifest = record(version.manifestJson);
+    const manifestDossier = record(manifest.dossier);
+    const totals = record(manifest.totals);
+    const taskValidations = Array.isArray(manifest.taskValidations)
+      ? manifest.taskValidations.map(record)
+      : [];
+    const detailByIssue = new Map(details.items.map((item) => [item.issueId, item]));
+    const discloseTaskTitles = record(manifestDossier.disclosurePolicy).taskTitles === true;
+    const tasks = taskValidations.map((validation, index) => {
+      const issueId = typeof validation.issueId === "string" ? validation.issueId : "";
+      const item = detailByIssue.get(issueId);
+      const itemTotals = record(item?.validation.totals);
+      return {
+        title: discloseTaskTitles && item?.issueTitle ? item.issueTitle : `Task ${index + 1}`,
+        state: typeof validation.state === "string" ? validation.state : "unknown",
+        runs: Number(itemTotals.runs ?? 0),
+        deliverables: Number(itemTotals.deliverables ?? 0),
+      };
+    });
+
+    const forwardedProto = String(req.headers["x-forwarded-proto"] ?? req.protocol).split(",")[0]?.trim();
+    const forwardedHost = String(req.headers["x-forwarded-host"] ?? req.get("host") ?? "localhost").split(",")[0]?.trim();
+    const baseUrl = process.env.PAPERCLIP_PUBLIC_URL || `${forwardedProto}://${forwardedHost}`;
+    const pdf = renderAssurancePdf({
+      title: typeof manifestDossier.title === "string" ? manifestDossier.title : dossier.title,
+      version: Number(manifest.version ?? version.version),
+      scopeLabel: typeof manifestDossier.scopeType === "string" ? manifestDossier.scopeType : dossier.scopeType,
+      publicId: typeof manifestDossier.publicId === "string" ? manifestDossier.publicId : dossier.publicId,
+      manifestSha256: version.manifestSha256,
+      sealedAt: typeof manifest.sealedAt === "string" ? manifest.sealedAt : version.sealedAt.toISOString(),
+      taskCount: taskValidations.length,
+      totals: {
+        costCents: Number(totals.costCents ?? 0),
+        inputTokens: Number(totals.inputTokens ?? 0),
+        outputTokens: Number(totals.outputTokens ?? 0),
+      },
+      tasks,
+      verificationUrl: `${baseUrl.replace(/\/$/, "")}/verify/${dossier.publicId}`,
+      signatureLabel: version.signatureAlgorithm
+        ? `${version.signatureAlgorithm}${version.signingKeyId ? ` / ${version.signingKeyId}` : ""}`
+        : "not configured",
+      timestampLabel: version.timestampStatus,
+    });
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Length", String(pdf.byteLength));
+    res.setHeader("Content-Disposition", 'attachment; filename="report.pdf"');
+    res.setHeader("Cache-Control", "no-store");
+    res.send(pdf);
+  }
+
   router.get("/assurance/dossiers/:dossierId/manifest.xml", (req, res) => void sendVersionAsset(req, res, "xmlAssetId", "evidence.xml"));
-  router.get("/assurance/dossiers/:dossierId/report.pdf", (req, res) => void sendVersionAsset(req, res, "pdfAssetId", "report.pdf"));
+  router.get("/assurance/dossiers/:dossierId/report.pdf", (req, res) => void sendCurrentPdf(req, res));
   router.get("/assurance/dossiers/:dossierId/bundle.zip", (req, res) => void sendVersionAsset(req, res, "bundleAssetId", "assurance-bundle.zip"));
 
   router.get("/public/assurance/verify/:publicId", async (req, res) => {
