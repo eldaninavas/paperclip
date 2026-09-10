@@ -5,7 +5,7 @@ Foundation has three independent execution contexts:
 | Environment | Address | Runtime | Data |
 |---|---|---|---|
 | Local | `http://127.0.0.1:3100` | Local process | Local PostgreSQL |
-| Development | `https://dev.foundation.davaria.app` | Fargate, normally scaled to zero | Ephemeral PostgreSQL sidecar + isolated EFS path |
+| Development | `https://foundation-dev.davaria.app` | Fargate, normally scaled to zero | Ephemeral PostgreSQL sidecar + isolated EFS path |
 | Production | `https://foundation.davaria.app` | Fargate, one task | Private RDS PostgreSQL + isolated EFS path |
 
 Development and production have separate ECS services, task definitions,

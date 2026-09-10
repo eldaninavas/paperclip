@@ -13,7 +13,7 @@ variable "vpc_cidr" {
 }
 variable "development_domain_name" {
   type    = string
-  default = "dev.foundation.davaria.app"
+  default = "foundation-dev.davaria.app"
 }
 variable "production_domain_name" {
   type    = string

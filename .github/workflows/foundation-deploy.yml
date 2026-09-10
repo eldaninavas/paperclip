@@ -93,7 +93,7 @@ jobs:
           aws elbv2 wait target-in-service --target-group-arn "$TARGET_GROUP"
       - name: Verify development health through Cloudflare Access
         env:
-          HEALTH_URL: https://dev.foundation.davaria.app/api/health
+          HEALTH_URL: https://foundation-dev.davaria.app/api/health
         run: |
           STATUS=$(curl --silent --output /dev/null --write-out '%{http_code}' "$HEALTH_URL")
           test "$STATUS" = "302" || test "$STATUS" = "401"
