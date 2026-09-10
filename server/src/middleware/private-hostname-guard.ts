@@ -50,7 +50,7 @@ export function resolvePrivateHostnameAllowSet(opts: { allowedHostnames: string[
 // outer shell. Emit a static `<host>` placeholder and do not echo the raw request
 // value. The operator supplies the real hostname.
 const BLOCKED_HOSTNAME_MESSAGE =
-  "This hostname is not allowed for this Paperclip instance. " +
+  "This hostname is not allowed for this Foundation instance. " +
   "If you want to allow a hostname, run npx paperclipai allowed-hostname <host>.";
 
 export function privateHostnameGuard(opts: {

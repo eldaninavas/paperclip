@@ -1968,7 +1968,7 @@ describeEmbeddedPostgres("secretService", () => {
       }),
     ).rejects.toMatchObject({
       status: 500,
-      message: "Secret create failed and Paperclip could not roll back the local secret reservation.",
+      message: "Secret create failed and Foundation could not roll back the local secret reservation.",
       details: {
         code: "secret_create_rollback_failed",
         provider: "aws_secrets_manager",
@@ -2035,7 +2035,7 @@ describeEmbeddedPostgres("secretService", () => {
       }),
     ).rejects.toMatchObject({
       status: 500,
-      message: "Secret create failed and Paperclip could not roll back the local secret reservation.",
+      message: "Secret create failed and Foundation could not roll back the local secret reservation.",
       details: {
         code: "secret_create_rollback_failed",
         provider: "aws_secrets_manager",
@@ -3065,7 +3065,7 @@ describeEmbeddedPostgres("secretService", () => {
       }),
     ).rejects.toMatchObject({
       status: 500,
-      message: "Secret create failed and Paperclip could not clean up the remote provider secret.",
+      message: "Secret create failed and Foundation could not clean up the remote provider secret.",
       details: {
         code: "secret_create_provider_cleanup_failed",
         provider: "aws_secrets_manager",
@@ -3134,7 +3134,7 @@ describeEmbeddedPostgres("secretService", () => {
       }),
     ).rejects.toMatchObject({
       status: 500,
-      message: "Secret create failed and Paperclip could not roll back the local secret reservation.",
+      message: "Secret create failed and Foundation could not roll back the local secret reservation.",
       details: {
         code: "secret_create_rollback_failed",
         provider: "aws_secrets_manager",
@@ -3558,7 +3558,7 @@ describeEmbeddedPostgres("secretService", () => {
       }),
     ).rejects.toMatchObject({
       status: 500,
-      message: "Secret create failed and Paperclip could not roll back the local secret reservation.",
+      message: "Secret create failed and Foundation could not roll back the local secret reservation.",
       details: {
         code: "secret_create_rollback_failed",
         provider: "aws_secrets_manager",
@@ -3688,10 +3688,10 @@ describeEmbeddedPostgres("secretService", () => {
         providerConfigId: "discovery-preview",
         providerVaultContext: "draft_config",
         region: "us-east-1",
-        credentialPath: "Paperclip server runtime/provider credential path",
+        credentialPath: "Foundation server runtime/provider credential path",
         requiredCapability: "secretsmanager:ListSecrets",
         actionableMessage:
-          "AWS discovery preview needs secretsmanager:ListSecrets in the selected region for the Paperclip server runtime/provider credential path.",
+          "AWS discovery preview needs secretsmanager:ListSecrets in the selected region for the Foundation server runtime/provider credential path.",
         safeAlternative:
           "If the operator already knows the exact AWS Secrets Manager ARN, paste/link that ARN instead of using discovery. Exact-resource DescribeSecret and runtime read permissions are still required.",
       },
@@ -4031,7 +4031,7 @@ describeEmbeddedPostgres("secretService", () => {
       errorCount: 1,
       results: [expect.objectContaining({ status: "error" })],
     });
-    expect(result.results[0]?.reason).toMatch(/Paperclip-managed namespace/i);
+    expect(result.results[0]?.reason).toMatch(/Foundation-managed namespace/i);
     const imported = await db.select().from(companySecrets).where(eq(companySecrets.key, "foreign-managed-secret"));
     expect(imported).toHaveLength(0);
   });

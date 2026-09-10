@@ -262,7 +262,7 @@ export function parseManagedConfigEnv(env: ManagedConfigEnv): ManagedInstanceCon
     // here provisions that row, so a longer list can never be satisfied.
     if (doc.environments.length > 1) {
       fail(
-        `"environments" supports at most one entry: each entry provisions the single Paperclip-managed sandbox environment (DB invariant environments_managed_sandbox_idx)`,
+        `"environments" supports at most one entry: each entry provisions the single Foundation-managed sandbox environment (DB invariant environments_managed_sandbox_idx)`,
       );
     }
     for (const [index, entry] of doc.environments.entries()) {

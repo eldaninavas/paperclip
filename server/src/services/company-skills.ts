@@ -307,7 +307,7 @@ function assertImportedSkillKeyAllowed(skill: ImportedSkill) {
   const sourceKind = asString(metadata?.sourceKind);
   if (sourceKind === "paperclip_bundled") return;
   throw unprocessable(
-    `Reserved Paperclip skill key "${skill.key}" cannot be imported from unbundled sources.`,
+    `Reserved Foundation skill key "${skill.key}" cannot be imported from unbundled sources.`,
     {
       skillKey: skill.key,
       sourceKind: sourceKind ?? skill.sourceType,
@@ -1937,7 +1937,7 @@ const BUILT_IN_SKILL_TEST_RUN_TEMPLATE_DATE = new Date("2026-01-01T00:00:00.000Z
 const BUILT_IN_SKILL_TEST_RUN_TEMPLATE_BODY = [
   "You are running a Skills Studio test for `{{skillName}}` (`{{skillKey}}`), skill version v{{skillVersion}}.",
   "",
-  "Invoke and use the selected skill under test: `{{skillInvocation}}`. Use the pinned skill revision supplied by Paperclip as the source of truth, regardless of any other runtime skills.",
+  "Invoke and use the selected skill under test: `{{skillInvocation}}`. Use the pinned skill revision supplied by Foundation as the source of truth, regardless of any other runtime skills.",
   "",
   "This is a test run. Do not make durable changes outside this test task. Do not mutate unrelated issues, push, publish, send external messages, or affect real work.",
   "",
@@ -1951,7 +1951,7 @@ function builtInSkillTestRunTemplate(companyId: string): CompanySkillTestRunTemp
     id: BUILT_IN_SKILL_TEST_RUN_TEMPLATE_ID,
     companyId,
     name: "Default test template",
-    description: "Paperclip's read-only default harness instructions for Skills Studio runs.",
+    description: "Foundation's read-only default harness instructions for Skills Studio runs.",
     body: BUILT_IN_SKILL_TEST_RUN_TEMPLATE_BODY,
     builtIn: true,
     createdByAgentId: null,
@@ -2354,9 +2354,9 @@ function buildMissingRuntimeSourceDetail(skill: Pick<CompanySkill, "name" | "sou
   const marker = getMissingSourceMarker(skill.metadata);
   const sourcePath = asString(marker?.sourcePath) ?? normalizeSourceLocatorDirectory(skill.sourceLocator);
   if (sourcePath) {
-    return `Company skill "${skill.name}" is in the library, but Paperclip cannot find its local source at ${sourcePath}.`;
+    return `Company skill "${skill.name}" is in the library, but Foundation cannot find its local source at ${sourcePath}.`;
   }
-  return `Company skill "${skill.name}" is in the library, but Paperclip cannot find a valid local runtime source for it.`;
+  return `Company skill "${skill.name}" is in the library, but Foundation cannot find a valid local runtime source for it.`;
 }
 
 export async function findMissingLocalSkillIds(
@@ -2658,8 +2658,8 @@ function deriveSkillSourceInfo(skill: SkillSourceInfoTarget): {
   if (metadata.sourceKind === "paperclip_bundled") {
     return {
       editable: false,
-      editableReason: "Bundled Paperclip skills are read-only.",
-      sourceLabel: "Paperclip bundled",
+      editableReason: "Bundled Foundation skills are read-only.",
+      sourceLabel: "Foundation bundled",
       sourceBadge: "paperclip",
       sourcePath: null,
     };
@@ -2708,7 +2708,7 @@ function deriveSkillSourceInfo(skill: SkillSourceInfoTarget): {
       return {
         editable: true,
         editableReason: null,
-        sourceLabel: "Paperclip workspace",
+        sourceLabel: "Foundation workspace",
         sourceBadge: "paperclip",
         sourcePath: managedRoot,
       };
@@ -2935,7 +2935,7 @@ export function companySkillService(db: Db) {
     if (!allowed) {
       throw forbidden("Local skill source is outside approved company workspace roots", {
         code: "skill_workspace_boundary_denied",
-        remediation: "Import from a configured Paperclip workspace or the company managed-skill directory.",
+        remediation: "Import from a configured Foundation workspace or the company managed-skill directory.",
       });
     }
   }
@@ -4022,7 +4022,7 @@ export function companySkillService(db: Db) {
 
     if (!isPaperclipManagedRenameTarget(skill)) {
       throw unprocessable(
-        "Only Paperclip-managed skills can be renamed. Catalog, external, project-scanned, and unmanaged local skills are read-only.",
+        "Only Foundation-managed skills can be renamed. Catalog, external, project-scanned, and unmanaged local skills are read-only.",
         { skillId: skill.id, sourceType: skill.sourceType, sourceKind: getSkillMeta(skill).sourceKind ?? null },
       );
     }
@@ -5622,7 +5622,7 @@ export function companySkillService(db: Db) {
       iconUrl: storeMetadata.iconUrl ?? existingByKey?.iconUrl ?? null,
       color: storeMetadata.color ?? existingByKey?.color ?? null,
       tagline: storeMetadata.tagline ?? existingByKey?.tagline ?? catalogSkill.description.slice(0, 120),
-      authorName: storeMetadata.authorName ?? existingByKey?.authorName ?? "Paperclip",
+      authorName: storeMetadata.authorName ?? existingByKey?.authorName ?? "Foundation",
       homepageUrl: storeMetadata.homepageUrl ?? existingByKey?.homepageUrl ?? catalogSkill.source?.url ?? null,
       categories: storeMetadata.categories.length > 0 ? storeMetadata.categories : normalizeCategoryList([catalogSkill.category, ...catalogSkill.tags]),
       sharingScope: existingByKey?.sharingScope ?? "company",

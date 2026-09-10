@@ -2029,7 +2029,7 @@ export function buildInviteOnboardingTextDocument(
       If none are reachable: ask your human operator for a reachable hostname/address and help them update network configuration.
       For authenticated/private mode, they may need:
       - npx paperclipai allowed-hostname <host>
-      - then restart Paperclip and retry onboarding.
+      - then restart Foundation and retry onboarding.
     `);
   }
 
