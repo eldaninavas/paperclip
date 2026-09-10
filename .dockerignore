@@ -17,6 +17,7 @@ packages/paperclip-runner/test
 packages/paperclip-runner/test-fixtures
 packages/paperclip-runner/test-support
 packages/paperclip-runner/**/*.md
+!packages/paperclip-runner/generated/capability/capability-contract.md
 packages/paperclip-runner/**/*.spec.ts
 packages/paperclip-runner/**/*.spec.tsx
 packages/paperclip-runner/**/*.test.cjs

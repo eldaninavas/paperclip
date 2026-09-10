@@ -33,7 +33,10 @@ jobs:
           node-version: 24.11.0
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @paperclipai/server typecheck
+      - name: Build server TypeScript dependencies
+        run: pnpm --filter @paperclipai/plugin-sdk ensure-build-deps
+      - name: Type-check server without rebuilding the native runner
+        run: pnpm --dir server exec tsc --noEmit
       - run: pnpm --filter @paperclipai/ui typecheck
       - run: pnpm --filter @paperclipai/ui build
 
