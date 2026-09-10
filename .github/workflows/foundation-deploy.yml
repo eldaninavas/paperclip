@@ -149,8 +149,12 @@ jobs:
                       and .name != "BOOTSTRAP_TOKEN_HASH"
                       and .name != "BOOTSTRAP_SCRIPT_B64"
                       and .name != "FOUNDATION_CLOUD_EXECUTION"
+                      and .name != "PAPERCLIP_DEPLOYMENT_EXPOSURE"
                     )))
-                    + [{"name":"FOUNDATION_CLOUD_EXECUTION","value":"true"}]
+                    + [
+                        {"name":"FOUNDATION_CLOUD_EXECUTION","value":"true"},
+                        {"name":"PAPERCLIP_DEPLOYMENT_EXPOSURE","value":"private"}
+                      ]
                   )
                 | .healthCheck = {"command":["CMD-SHELL","curl -fsS http://127.0.0.1:3100/api/health || exit 1"],"interval":30,"timeout":5,"retries":3,"startPeriod":90}
               else . end

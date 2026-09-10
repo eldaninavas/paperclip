@@ -8,6 +8,7 @@ import { Card } from "@/components/ui/card";
 
 type BootstrapPendingPageProps = {
   claimAvailable: boolean;
+  hosted?: boolean;
   hasActiveInvite?: boolean;
   session: AuthSession | null | undefined;
   claimState: "idle" | "claiming" | "success";
@@ -67,6 +68,7 @@ function claimErrorCopy(error: BootstrapPendingPageProps["claimError"]) {
 
 export function BootstrapPendingPage({
   claimAvailable,
+  hosted = false,
   hasActiveInvite = false,
   session,
   claimState,
@@ -76,16 +78,21 @@ export function BootstrapPendingPage({
   if (!claimAvailable) {
     return (
       <StateChrome>
-        <h1 className="text-xl font-semibold">This Foundation is waiting on its first admin</h1>
+        <h1 className="text-xl font-semibold">
+          {hosted ? "Foundation Cloud is finishing setup" : "This Foundation is waiting on its first admin"}
+        </h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          This instance runs in invite-only mode. The operator must generate a one-time first-admin invite URL
-          from the host. Once you have the link, open it from this browser to finish setup.
+          {hosted
+            ? "Your workspace is online, but administrator enrollment is not available yet. Please try again in a moment."
+            : "This instance runs in invite-only mode. The operator must generate a one-time first-admin invite URL from the host. Once you have the link, open it from this browser to finish setup."}
         </p>
-        <CliFallback hasActiveInvite={hasActiveInvite} />
-        <p className="mt-4 text-xs text-muted-foreground">
-          Browser-based claim is intentionally disabled in public mode so anyone on the network can't promote
-          themselves.
-        </p>
+        {!hosted && <CliFallback hasActiveInvite={hasActiveInvite} />}
+        {!hosted && (
+          <p className="mt-4 text-xs text-muted-foreground">
+            Browser-based claim is intentionally disabled in public mode so anyone on the network can't promote
+            themselves.
+          </p>
+        )}
       </StateChrome>
     );
   }
@@ -130,7 +137,7 @@ export function BootstrapPendingPage({
             <Link to="/auth?next=/">Sign in / Create account</Link>
           </Button>
         </div>
-        <CliFallback hasActiveInvite={hasActiveInvite} />
+        {!hosted && <CliFallback hasActiveInvite={hasActiveInvite} />}
       </StateChrome>
     );
   }
@@ -171,7 +178,7 @@ export function BootstrapPendingPage({
           </div>
         </div>
       )}
-      <CliFallback hasActiveInvite={hasActiveInvite} />
+      {!hosted && <CliFallback hasActiveInvite={hasActiveInvite} />}
     </StateChrome>
   );
 }

@@ -52,7 +52,9 @@ resource "aws_ecs_task_definition" "environment" {
       { name = "PAPERCLIP_INSTANCE_ID", value = "default" },
       { name = "PAPERCLIP_CONFIG", value = "/paperclip/instances/default/config.json" },
       { name = "PAPERCLIP_DEPLOYMENT_MODE", value = "authenticated" },
-      { name = "PAPERCLIP_DEPLOYMENT_EXPOSURE", value = "public" },
+      # Cloudflare Access is the public identity boundary. Inside that boundary,
+      # Foundation may safely enroll the first authenticated administrator in-browser.
+      { name = "PAPERCLIP_DEPLOYMENT_EXPOSURE", value = "private" },
       { name = "PAPERCLIP_PUBLIC_URL", value = "https://${each.value.domain}" },
       { name = "PAPERCLIP_ALLOWED_HOSTNAMES", value = each.value.domain },
       { name = "PAPERCLIP_MIGRATION_AUTO_APPLY", value = "true" },

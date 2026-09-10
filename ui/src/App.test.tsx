@@ -167,6 +167,27 @@ describe("CloudAccessGate", () => {
     unmountRoot(root);
   });
 
+  it("keeps host CLI instructions out of Foundation Cloud administrator enrollment", async () => {
+    mockHealthApi.get.mockResolvedValue({
+      status: "ok",
+      deploymentMode: "authenticated",
+      deploymentExposure: "private",
+      bootstrapStatus: "bootstrap_pending",
+      bootstrapInviteActive: false,
+      features: { foundationCloudExecutionEnabled: true },
+    });
+    mockAuthApi.getSession.mockResolvedValue(null);
+
+    const root = renderGate(container);
+    await waitForText(container, "Finish setting up this Foundation");
+
+    expect(container.textContent).toContain("Sign in / Create account");
+    expect(container.textContent).not.toContain("paperclipai");
+    expect(container.textContent).not.toContain("finish setup from the host");
+
+    unmountRoot(root);
+  });
+
   it("shows the claim action for signed-in private bootstrap-pending instances", async () => {
     mockHealthApi.get.mockResolvedValue({
       status: "ok",

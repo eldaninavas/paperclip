@@ -103,6 +103,7 @@ export function CloudAccessGate() {
     return (
       <BootstrapPendingPage
         claimAvailable={health.deploymentExposure === "private"}
+        hosted={Boolean(health.features?.foundationCloudExecutionEnabled)}
         hasActiveInvite={health.bootstrapInviteActive}
         session={sessionQuery.data}
         claimState={claimMutation.isSuccess ? "success" : claimMutation.isPending ? "claiming" : "idle"}
