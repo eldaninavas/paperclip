@@ -1,5 +1,4 @@
 import fs from "node:fs/promises";
-import { signalAssuranceJob } from "./assurance/reconciler.js";
 import path from "node:path";
 import { execFile as execFileCallback } from "node:child_process";
 import { promisify } from "node:util";
@@ -99,6 +98,7 @@ import {
 } from "../instrumentation.js";
 import { createHostDuplexObservabilityRecorder } from "./duplex-observability-recorder.js";
 import { incrementToolRuntimeMetricCounter } from "./tool-runtime-metrics.js";
+import { signalAssuranceJob } from "./assurance/reconciler.js";
 import { logger } from "../middleware/logger.js";
 import {
   createGitRemoteAuthProvider,
@@ -181,6 +181,7 @@ import {
 import { costService } from "./costs.js";
 import { trackAgentFirstHeartbeat } from "@paperclipai/shared/telemetry";
 import { getTelemetryClient } from "../telemetry.js";
+import { emitAgentTaskRun } from "./agent-task-run-telemetry.js";
 import { companySkillService } from "./company-skills.js";
 import { budgetService, type BudgetEnforcementScope } from "./budgets.js";
 import { secretService, type MissingRuntimeBinding } from "./secrets.js";
@@ -10689,11 +10690,73 @@ export function heartbeatService(
     return ensured;
   }
 
+  // Emits agent.task_run for a run write that just reached a terminal
+  // status, unless the write only re-set a status the run already had (a
+  // status-preserving patch, such as a livenessReason update on a run that
+  // finished earlier). Only a genuine transition into a terminal status
+  // emits. The emission runs in the background: it never blocks the
+  // caller's remaining lifecycle work, because emitAgentTaskRun never
+  // throws (it logs and swallows its own failures).
+  function emitTerminalAgentTaskRun(
+    updated: typeof heartbeatRuns.$inferSelect,
+    previousStatus: string | null,
+  ) {
+    if (!isHeartbeatRunTerminalStatus(updated.status)) return;
+    if (previousStatus === updated.status) return;
+    clearHeartbeatRunRuntimeStatus(updated.id);
+    void emitAgentTaskRun(db, updated);
+  }
+
+  function enqueueTerminalAssuranceReconciliation(
+    updated: typeof heartbeatRuns.$inferSelect,
+  ) {
+    if (!isHeartbeatRunTerminalStatus(updated.status)) return;
+    const assuranceIssueId =
+      updated.nativeIssueId ??
+      (typeof updated.contextSnapshot?.issueId === "string"
+        ? updated.contextSnapshot.issueId
+        : null) ??
+      (typeof updated.contextSnapshot?.taskId === "string"
+        ? updated.contextSnapshot.taskId
+        : null);
+
+    void signalAssuranceJob({
+      db,
+      companyId: updated.companyId,
+      kind: "run_record",
+      dedupeKey: `run:${updated.id}:${updated.updatedAt.toISOString()}`,
+      payload: { runId: updated.id },
+    })
+      .then(() =>
+        assuranceIssueId
+          ? signalAssuranceJob({
+              db,
+              companyId: updated.companyId,
+              kind: "task_validate",
+              dedupeKey: `run-task:${updated.id}:${updated.updatedAt.toISOString()}`,
+              payload: { issueId: assuranceIssueId },
+            })
+          : null,
+      )
+      .catch((err) =>
+        logger.warn(
+          { err, runId: updated.id },
+          "failed to enqueue Assurance reconciliation",
+        ),
+      );
+  }
+
   async function setRunStatus(
     runId: string,
     status: string,
     patch?: Partial<typeof heartbeatRuns.$inferInsert>,
   ) {
+    const previousStatus = await db
+      .select({ status: heartbeatRuns.status })
+      .from(heartbeatRuns)
+      .where(eq(heartbeatRuns.id, runId))
+      .then((rows) => rows[0]?.status ?? null);
+
     const updated = await db
       .update(heartbeatRuns)
       .set({ status, ...patch, updatedAt: new Date() })
@@ -10702,33 +10765,14 @@ export function heartbeatService(
       .then((rows) => rows[0] ?? null);
 
     if (updated) {
-      if (isHeartbeatRunTerminalStatus(updated.status)) {
-        clearHeartbeatRunRuntimeStatus(updated.id);
-      }
       publishLiveEvent({
         companyId: updated.companyId,
         type: "heartbeat.run.status",
         payload: buildHeartbeatRunStatusLiveEventPayload(updated),
       });
       publishRunLifecyclePluginEvent(updated);
-      if (isHeartbeatRunTerminalStatus(updated.status)) {
-        const assuranceIssueId = updated.nativeIssueId
-          ?? (typeof updated.contextSnapshot?.issueId === "string" ? updated.contextSnapshot.issueId : null)
-          ?? (typeof updated.contextSnapshot?.taskId === "string" ? updated.contextSnapshot.taskId : null);
-        void signalAssuranceJob({
-          db,
-          companyId: updated.companyId,
-          kind: "run_record",
-          dedupeKey: `run:${updated.id}:${updated.updatedAt.toISOString()}`,
-          payload: { runId: updated.id },
-        }).then(() => assuranceIssueId ? signalAssuranceJob({
-          db,
-          companyId: updated.companyId,
-          kind: "task_validate",
-          dedupeKey: `run-task:${updated.id}:${updated.updatedAt.toISOString()}`,
-          payload: { issueId: assuranceIssueId },
-        }) : null).catch((err) => logger.warn({ err, runId: updated.id }, "failed to enqueue Assurance reconciliation"));
-      }
+      emitTerminalAgentTaskRun(updated, previousStatus);
+      enqueueTerminalAssuranceReconciliation(updated);
     }
 
     return updated;
@@ -10753,6 +10797,15 @@ export function heartbeatService(
     fromStatuses: string[],
     patch?: Partial<typeof heartbeatRuns.$inferInsert>,
   ) {
+    // fromStatuses can name a terminal status as its own source (for example,
+    // an idempotent "still failed" patch), so the write below is not always a
+    // genuine transition. Read the pre-write status to tell the two apart.
+    const previousStatus = await db
+      .select({ status: heartbeatRuns.status })
+      .from(heartbeatRuns)
+      .where(eq(heartbeatRuns.id, runId))
+      .then((rows) => rows[0]?.status ?? null);
+
     const updated = await db
       .update(heartbeatRuns)
       .set({ status, ...patch, updatedAt: new Date() })
@@ -10766,33 +10819,14 @@ export function heartbeatService(
       .then((rows) => rows[0] ?? null);
 
     if (updated) {
-      if (isHeartbeatRunTerminalStatus(updated.status)) {
-        clearHeartbeatRunRuntimeStatus(updated.id);
-      }
       publishLiveEvent({
         companyId: updated.companyId,
         type: "heartbeat.run.status",
         payload: buildHeartbeatRunStatusLiveEventPayload(updated),
       });
       publishRunLifecyclePluginEvent(updated);
-      if (isHeartbeatRunTerminalStatus(updated.status)) {
-        const assuranceIssueId = updated.nativeIssueId
-          ?? (typeof updated.contextSnapshot?.issueId === "string" ? updated.contextSnapshot.issueId : null)
-          ?? (typeof updated.contextSnapshot?.taskId === "string" ? updated.contextSnapshot.taskId : null);
-        void signalAssuranceJob({
-          db,
-          companyId: updated.companyId,
-          kind: "run_record",
-          dedupeKey: `run:${updated.id}:${updated.updatedAt.toISOString()}`,
-          payload: { runId: updated.id },
-        }).then(() => assuranceIssueId ? signalAssuranceJob({
-          db,
-          companyId: updated.companyId,
-          kind: "task_validate",
-          dedupeKey: `run-task:${updated.id}:${updated.updatedAt.toISOString()}`,
-          payload: { issueId: assuranceIssueId },
-        }) : null).catch((err) => logger.warn({ err, runId: updated.id }, "failed to enqueue Assurance reconciliation"));
-      }
+      emitTerminalAgentTaskRun(updated, previousStatus);
+      enqueueTerminalAssuranceReconciliation(updated);
       return { run: updated, updated: true as const };
     }
 
@@ -13297,6 +13331,11 @@ export function heartbeatService(
 
     if (!cancelled) return null;
 
+    // Telemetry is best-effort background work. Fire it in the background
+    // instead of awaiting it, so a slow telemetry lookup never delays the
+    // wake cancel, the issue lock clear, or this function's return.
+    void emitAgentTaskRun(db, cancelled);
+
     if (cancelled.wakeupRequestId) {
       await db
         .update(agentWakeupRequests)
@@ -15398,6 +15437,9 @@ export function heartbeatService(
         },
       });
       publishRunLifecyclePluginEvent(queuedCommentClaim.run);
+      // Fire-and-forget: nothing else in this path depends on the emission,
+      // so it must not delay the return.
+      void emitAgentTaskRun(db, queuedCommentClaim.run);
       return null;
     }
     const claimed = queuedCommentClaim
@@ -23487,6 +23529,8 @@ export function heartbeatService(
       // same issue workspace while the assignee already has a live run.
       const agentNameKey = normalizeAgentNameKey(agent.name);
 
+      const cancelledRunsToEmit: (typeof heartbeatRuns.$inferSelect)[] = [];
+
       const outcome = await db.transaction(async (tx) => {
         await tx.execute(
           sql`select id from issues where id = ${issueId} and company_id = ${agent.companyId} for update`,
@@ -23690,6 +23734,8 @@ export function heartbeatService(
             .set({ nextEventSeq: eventSeq + 1, updatedAt: now })
             .where(eq(heartbeatRuns.id, cancelled.id));
 
+          cancelledRunsToEmit.push(cancelled);
+
           return true;
         };
 
@@ -23754,8 +23800,9 @@ export function heartbeatService(
                 eq(heartbeatRuns.status, activeExecutionRun.status),
               ),
             )
-            .returning({ id: heartbeatRuns.id });
+            .returning();
           if (cancelled.length > 0) {
+            cancelledRunsToEmit.push(cancelled[0]);
             if (activeExecutionRun.wakeupRequestId) {
               await tx
                 .update(agentWakeupRequests)
@@ -24385,8 +24432,17 @@ export function heartbeatService(
         return { kind: "queued" as const, run: newRun };
       });
 
-      if (outcome.kind === "deferred" || outcome.kind === "skipped")
+      // Telemetry for the cancelled runs is best-effort background work.
+      // Fire it here and never await it: none of the lifecycle work below,
+      // nor this function's return, depends on it, so a slow telemetry
+      // lookup must not delay them.
+      for (const cancelledRun of cancelledRunsToEmit) {
+        void emitAgentTaskRun(db, cancelledRun);
+      }
+
+      if (outcome.kind === "deferred" || outcome.kind === "skipped") {
         return null;
+      }
       if (outcome.kind === "coalesced") {
         await startNextQueuedRunForAgent(agent.id);
         return outcome.run;

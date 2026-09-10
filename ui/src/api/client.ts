@@ -1,4 +1,5 @@
 import { getPageVisibility, getVisibilityHeaderValue } from "@/lib/page-visibility";
+import { tenantSessionRecovery } from "@/lib/tenant-session-recovery";
 
 const BASE = "/api";
 
@@ -53,7 +54,11 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   });
   if (!res.ok) {
     const errorBody = await res.json().catch(() => null);
-    const rawMessage = (errorBody as { error?: string } | null)?.error ?? `Request failed: ${res.status}`;
+    const recovery = tenantSessionRecovery.recoverIfNeeded(res.status, errorBody);
+    if (recovery) return recovery;
+    const rawMessage =
+      (errorBody as { error?: string } | null)?.error ??
+      `Request failed: ${res.status}`;
     throw new ApiError(
       rawMessage.replaceAll("Paperclip", "Foundation").replaceAll("paperclip", "Foundation"),
       res.status,
