@@ -28,10 +28,16 @@ jobs:
       - name: Inspect ECS service
         env:
           SERVICE: foundation-${{ inputs.environment == 'production' && 'prod' || 'dev' }}
+          TARGET_GROUP: ${{ vars.AWS_TARGET_GROUP_ARN }}
         run: |
           aws ecs describe-services \
             --region mx-central-1 \
             --cluster foundation \
             --services "$SERVICE" \
             --query 'services[0].{desired:desiredCount,running:runningCount,pending:pendingCount,deployments:deployments[].{status:status,rollout:rolloutState,reason:rolloutStateReason,desired:desiredCount,running:runningCount,pending:pendingCount,failed:failedTasks,taskDefinition:taskDefinition},events:events[0:15].{at:createdAt,message:message}}' \
+            --output json
+          aws elbv2 describe-target-health \
+            --region mx-central-1 \
+            --target-group-arn "$TARGET_GROUP" \
+            --query 'TargetHealthDescriptions[].{target:Target.Id,port:Target.Port,state:TargetHealth.State,reason:TargetHealth.Reason,description:TargetHealth.Description}' \
             --output json
