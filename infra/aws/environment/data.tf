@@ -59,7 +59,7 @@ resource "aws_secretsmanager_secret" "database_url" {
 resource "aws_secretsmanager_secret_version" "database_url" {
   for_each      = local.environments
   secret_id     = aws_secretsmanager_secret.database_url[each.key].id
-  secret_string = each.key == "production" ? "postgresql://foundation:${random_password.database.result}@${aws_db_instance.production.address}:5432/foundation" : "postgresql://foundation_dev:${random_password.development_database.result}@127.0.0.1:5432/foundation_dev"
+  secret_string = each.key == "production" ? "postgresql://foundation:${random_password.database.result}@${aws_db_instance.production.address}:5432/foundation?sslmode=require" : "postgresql://foundation_dev:${random_password.development_database.result}@127.0.0.1:5432/foundation_dev"
 }
 
 resource "aws_secretsmanager_secret" "auth" {

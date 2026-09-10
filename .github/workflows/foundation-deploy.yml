@@ -128,11 +128,15 @@ jobs:
           FAMILY: foundation-prod
         run: |
           aws ecs describe-task-definition --task-definition "$FAMILY" --query taskDefinition > task-definition.json
-          jq --arg image "$IMAGE" '
+          START_COMMAND='case "$DATABASE_URL" in *sslmode=*) ;; *\?*) DATABASE_URL="${DATABASE_URL}&sslmode=require" ;; *) DATABASE_URL="${DATABASE_URL}?sslmode=require" ;; esac; export DATABASE_URL; exec node --import ./server/node_modules/tsx/dist/loader.mjs server/dist/index.js'
+          jq --arg image "$IMAGE" --arg startCommand "$START_COMMAND" '
             .containerDefinitions |= map(
               if .name == "foundation" then
                 .image = $image
-                | .environment = ((.environment // []) | map(select(.name != "PGSSLMODE")) + [{"name":"PGSSLMODE","value":"require"}])
+                | del(.entryPoint)
+                | .command = ["sh","-lc",$startCommand]
+                | .environment = ((.environment // []) | map(select(.name != "PGSSLMODE")))
+                | .healthCheck = {"command":["CMD-SHELL","curl -fsS http://127.0.0.1:3100/api/health || exit 1"],"interval":30,"timeout":5,"retries":3,"startPeriod":90}
               else . end
             )
             | del(.taskDefinitionArn,.revision,.status,.requiresAttributes,.compatibilities,.registeredAt,.registeredBy)
