@@ -28,6 +28,7 @@ packages/paperclip-runner/**/*.test.jsx
 packages/paperclip-runner/**/*.test.mjs
 packages/paperclip-runner/**/*.test.mts
 packages/paperclip-runner/**/*.test.ts
+!packages/paperclip-runner/src/**/*.test.ts
 packages/paperclip-runner/**/*.test.tsx
 packages/paperclip-runner/runner/crates/*/tests
 packages/paperclip-runner/scripts/*-smoke.mjs
