@@ -10,6 +10,10 @@ on:
         required: true
         default: false
         type: boolean
+      image_tag:
+        description: Optional previously built commit SHA to redeploy or roll back
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -60,10 +64,12 @@ jobs:
         env:
           REGISTRY: ${{ steps.login.outputs.registry }}
           REPOSITORY: foundation/server
-          IMAGE_TAG: ${{ github.sha }}
+          IMAGE_TAG: ${{ inputs.image_tag || github.sha }}
         run: echo "uri=$REGISTRY/$REPOSITORY:$IMAGE_TAG" >> "$GITHUB_OUTPUT"
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/build-push-action@v6
+      - if: inputs.image_tag == ''
+        uses: docker/setup-buildx-action@v3
+      - if: inputs.image_tag == ''
+        uses: docker/build-push-action@v6
         with:
           context: .
           platforms: linux/arm64
