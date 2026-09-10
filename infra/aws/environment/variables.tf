@@ -23,6 +23,11 @@ variable "github_repository" {
   type    = string
   default = "eldaninavas/paperclip"
 }
+variable "github_repository_subject" {
+  description = "GitHub OIDC repository subject, including immutable owner and repository IDs."
+  type        = string
+  default     = "eldaninavas@45270406/paperclip@1356866529"
+}
 variable "github_oidc_provider_arn" { type = string }
 variable "ecr_repository_arn" { type = string }
 variable "ecr_repository_url" { type = string }
