@@ -171,7 +171,7 @@ describe("CloudAccessGate", () => {
     mockHealthApi.get.mockResolvedValue({
       status: "ok",
       deploymentMode: "authenticated",
-      deploymentExposure: "private",
+      deploymentExposure: "public",
       bootstrapStatus: "bootstrap_pending",
       bootstrapInviteActive: false,
       features: { foundationCloudExecutionEnabled: true },

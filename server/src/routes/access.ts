@@ -2638,6 +2638,7 @@ export function accessRoutes(
   opts: {
     deploymentMode: DeploymentMode;
     deploymentExposure: DeploymentExposure;
+    browserBootstrapClaimEnabled?: boolean;
     bindHost: string;
     allowedHostnames: string[];
     inviteResolutionNetwork?: Partial<InviteResolutionNetwork>;
@@ -2742,7 +2743,7 @@ export function accessRoutes(
   router.post("/bootstrap/claim", async (req, res) => {
     if (
       opts.deploymentMode !== "authenticated" ||
-      opts.deploymentExposure !== "private"
+      (opts.deploymentExposure !== "private" && !opts.browserBootstrapClaimEnabled)
     ) {
       throw notFound("Browser first-admin claim is not available");
     }

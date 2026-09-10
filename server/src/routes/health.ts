@@ -319,6 +319,9 @@ export function healthRoutes(
         commit,
         bootstrapStatus,
         bootstrapInviteActive,
+        ...(isTruthyEnvValue(runtimeEnv.FOUNDATION_CLOUD_EXECUTION)
+          ? { features: { foundationCloudExecutionEnabled: true } }
+          : {}),
         ...(redactedDatabaseBackup ? { databaseBackup: redactedDatabaseBackup } : {}),
         ...(redactedWarnings ? { warnings: redactedWarnings } : {}),
         ...(devServer ? { devServer } : {}),

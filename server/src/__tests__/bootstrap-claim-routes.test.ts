@@ -53,6 +53,7 @@ function createApp(input: {
   actor?: Record<string, unknown>;
   deploymentMode?: "authenticated" | "local_trusted";
   deploymentExposure?: "private" | "public";
+  browserBootstrapClaimEnabled?: boolean;
   guardMutations?: boolean;
   db?: Record<string, unknown>;
 }) {
@@ -74,6 +75,7 @@ function createApp(input: {
     accessRoutes(input.db as any ?? createDb(), {
       deploymentMode: input.deploymentMode ?? "authenticated",
       deploymentExposure: input.deploymentExposure ?? "private",
+      browserBootstrapClaimEnabled: input.browserBootstrapClaimEnabled,
       bindHost: "127.0.0.1",
       allowedHostnames: [],
     }),
@@ -109,6 +111,18 @@ describe("POST /bootstrap/claim", () => {
 
     expect(res.status).toBe(404);
     expect(claimFirstInstanceAdminMock).not.toHaveBeenCalled();
+  });
+
+  it("allows an authenticated browser claim for hosted Foundation Cloud", async () => {
+    const app = createApp({
+      deploymentExposure: "public",
+      browserBootstrapClaimEnabled: true,
+    });
+
+    const res = await request(app).post("/api/bootstrap/claim").send({});
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ claimed: true, userId: "user-1" });
   });
 
   it("is not exposed in local trusted mode", async () => {

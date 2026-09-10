@@ -688,6 +688,9 @@ export async function createApp(
     accessRoutes(db, {
       deploymentMode: opts.deploymentMode,
       deploymentExposure: opts.deploymentExposure,
+      browserBootstrapClaimEnabled: ["1", "true", "yes", "on"].includes(
+        (process.env.FOUNDATION_CLOUD_EXECUTION ?? "").trim().toLowerCase(),
+      ),
       bindHost: opts.bindHost,
       allowedHostnames: opts.allowedHostnames,
       authPublicBaseUrl: opts.authPublicBaseUrl,

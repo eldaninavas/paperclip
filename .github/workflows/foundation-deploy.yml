@@ -153,7 +153,7 @@ jobs:
                     )))
                     + [
                         {"name":"FOUNDATION_CLOUD_EXECUTION","value":"true"},
-                        {"name":"PAPERCLIP_DEPLOYMENT_EXPOSURE","value":"private"}
+                        {"name":"PAPERCLIP_DEPLOYMENT_EXPOSURE","value":"public"}
                       ]
                   )
                 | .healthCheck = {"command":["CMD-SHELL","curl -fsS http://127.0.0.1:3100/api/health || exit 1"],"interval":30,"timeout":5,"retries":3,"startPeriod":90}
