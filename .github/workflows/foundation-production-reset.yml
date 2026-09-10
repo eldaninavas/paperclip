@@ -1,0 +1,238 @@
+name: Foundation production factory reset
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: Type RESET FOUNDATION PRODUCTION TO ZERO
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: foundation-production-maintenance
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: mx-central-1
+  CLUSTER: foundation
+  SERVICE: foundation-prod
+
+jobs:
+  reset:
+    if: inputs.confirmation == 'RESET FOUNDATION PRODUCTION TO ZERO'
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 35
+    steps:
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Reset active production data and restore the application
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+
+          ORIGINAL_TASK_DEFINITION=$(aws ecs describe-services \
+            --cluster "$CLUSTER" \
+            --services "$SERVICE" \
+            --query 'services[0].taskDefinition' \
+            --output text)
+          test -n "$ORIGINAL_TASK_DEFINITION"
+          test "$ORIGINAL_TASK_DEFINITION" != "None"
+
+          restore_service() {
+            aws ecs update-service \
+              --cluster "$CLUSTER" \
+              --service "$SERVICE" \
+              --task-definition "$ORIGINAL_TASK_DEFINITION" \
+              --desired-count 1 \
+              --deployment-configuration maximumPercent=200,minimumHealthyPercent=100 \
+              --force-new-deployment >/dev/null || true
+          }
+          trap restore_service EXIT
+
+          cat > /tmp/foundation-reset.mjs <<'RESET_SCRIPT'
+          import { mkdir, rename, stat, writeFile } from "node:fs/promises";
+          import http from "node:http";
+          import postgres from "/app/packages/db/node_modules/postgres/src/index.js";
+
+          const EXPECTED_CONFIRMATION = "RESET FOUNDATION PRODUCTION TO ZERO";
+          if (process.env.FOUNDATION_RESET_CONFIRM !== EXPECTED_CONFIRMATION) {
+            throw new Error("Production reset confirmation is missing or incorrect.");
+          }
+
+          const rawUrl = process.env.DATABASE_URL;
+          if (!rawUrl) throw new Error("DATABASE_URL is not available.");
+          const parsed = new URL(rawUrl);
+          const isExpectedDatabase =
+            parsed.hostname.startsWith("foundation-prod-postgres.") &&
+            parsed.pathname === "/foundation" &&
+            parsed.username === "foundation";
+          if (!isExpectedDatabase) {
+            throw new Error("Refusing to reset an unexpected database target.");
+          }
+
+          const stamp = new Date().toISOString().replaceAll(/[-:.]/g, "").replace("Z", "Z");
+          const backupSchema = `foundation_reset_backup_${stamp}`;
+          if (!/^[a-z0-9_]+$/i.test(backupSchema)) throw new Error("Unsafe backup schema name.");
+
+          const sql = postgres(rawUrl, { max: 1, connect_timeout: 15, onnotice: () => {} });
+          let tableNames = [];
+          let companyCountBefore = 0;
+          try {
+            tableNames = (await sql`
+              SELECT tablename
+              FROM pg_tables
+              WHERE schemaname = 'public'
+              ORDER BY tablename
+            `).map((row) => row.tablename);
+            if (tableNames.length === 0) throw new Error("Production schema contains no application tables.");
+
+            if (tableNames.includes("companies")) {
+              const [row] = await sql`SELECT count(*)::int AS count FROM public.companies`;
+              companyCountBefore = row.count;
+            }
+
+            await sql.begin(async (tx) => {
+              await tx.unsafe(`CREATE SCHEMA "${backupSchema}"`);
+              for (const table of tableNames) {
+                if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(table)) {
+                  throw new Error(`Unsafe table name: ${table}`);
+                }
+                await tx.unsafe(`CREATE TABLE "${backupSchema}"."${table}" AS TABLE public."${table}"`);
+              }
+              const quotedTables = tableNames.map((table) => `public."${table}"`).join(", ");
+              await tx.unsafe(`TRUNCATE TABLE ${quotedTables} RESTART IDENTITY CASCADE`);
+            });
+
+            let remainingRows = 0;
+            for (const table of tableNames) {
+              const [row] = await sql.unsafe(`SELECT count(*)::int AS count FROM public."${table}"`);
+              remainingRows += row.count;
+            }
+            if (remainingRows !== 0) throw new Error(`Reset verification failed: ${remainingRows} rows remain.`);
+
+            const archiveRoot = `/paperclip/reset-archives/${stamp}`;
+            await mkdir(archiveRoot, { recursive: true });
+            const activePaths = [
+              ["/paperclip/instances/default/projects", "projects"],
+              ["/paperclip/instances/default/workspaces", "workspaces"],
+              ["/paperclip/instances/default/data/storage", "storage"],
+              ["/paperclip/instances/default/logs", "logs"],
+            ];
+            for (const [source, name] of activePaths) {
+              try {
+                await stat(source);
+                await rename(source, `${archiveRoot}/${name}`);
+              } catch (error) {
+                if (error?.code !== "ENOENT") throw error;
+              }
+              await mkdir(source, { recursive: true });
+            }
+
+            const result = {
+              completedAt: new Date().toISOString(),
+              database: "foundation-prod-postgres/foundation",
+              backupSchema,
+              archiveRoot,
+              tablesCleared: tableNames.length,
+              companiesBefore: companyCountBefore,
+              remainingRows,
+            };
+            await writeFile(`${archiveRoot}/RESET.json`, `${JSON.stringify(result, null, 2)}\n`, "utf8");
+            console.log(`FOUNDATION_RESET_COMPLETE ${JSON.stringify(result)}`);
+
+            const server = http.createServer((request, response) => {
+              if (request.url === "/api/health") {
+                response.writeHead(200, { "content-type": "application/json" });
+                response.end(JSON.stringify({ ok: true, reset: true, remainingRows }));
+                return;
+              }
+              response.writeHead(404);
+              response.end();
+            });
+            server.listen(3100, "0.0.0.0");
+          } finally {
+            await sql.end({ timeout: 5 });
+          }
+          RESET_SCRIPT
+
+          RESET_SCRIPT_B64=$(base64 -w 0 /tmp/foundation-reset.mjs)
+          aws ecs describe-task-definition \
+            --task-definition "$ORIGINAL_TASK_DEFINITION" \
+            --query taskDefinition > /tmp/task-definition.json
+
+          RESET_COMMAND='printf "%s" "$FOUNDATION_RESET_SCRIPT_B64" | base64 -d > /tmp/foundation-reset.mjs; exec node /tmp/foundation-reset.mjs'
+          jq \
+            --arg script "$RESET_SCRIPT_B64" \
+            --arg command "$RESET_COMMAND" '
+              .family = "foundation-prod-factory-reset"
+              | .containerDefinitions |= map(
+                  if .name == "foundation" then
+                    del(.entryPoint)
+                    | .command = ["sh", "-lc", $command]
+                    | .environment = (
+                        ((.environment // []) | map(select(
+                          .name != "FOUNDATION_RESET_CONFIRM"
+                          and .name != "FOUNDATION_RESET_SCRIPT_B64"
+                        )))
+                        + [
+                            {"name":"FOUNDATION_RESET_CONFIRM","value":"RESET FOUNDATION PRODUCTION TO ZERO"},
+                            {"name":"FOUNDATION_RESET_SCRIPT_B64","value":$script}
+                          ]
+                      )
+                    | .healthCheck = {
+                        "command":["CMD-SHELL","curl -fsS http://127.0.0.1:3100/api/health | grep -q \\\"reset\\\":true"],
+                        "interval":10,
+                        "timeout":5,
+                        "retries":3,
+                        "startPeriod":30
+                      }
+                  else . end
+                )
+              | del(.taskDefinitionArn,.revision,.status,.requiresAttributes,.compatibilities,.registeredAt,.registeredBy)
+            ' /tmp/task-definition.json > /tmp/reset-task-definition.json
+
+          RESET_TASK_DEFINITION=$(aws ecs register-task-definition \
+            --cli-input-json file:///tmp/reset-task-definition.json \
+            --query taskDefinition.taskDefinitionArn \
+            --output text)
+
+          aws ecs update-service \
+            --cluster "$CLUSTER" \
+            --service "$SERVICE" \
+            --desired-count 0 >/dev/null
+          aws ecs wait services-stable --cluster "$CLUSTER" --services "$SERVICE"
+
+          aws ecs update-service \
+            --cluster "$CLUSTER" \
+            --service "$SERVICE" \
+            --task-definition "$RESET_TASK_DEFINITION" \
+            --desired-count 1 \
+            --deployment-configuration maximumPercent=100,minimumHealthyPercent=0 \
+            --force-new-deployment >/dev/null
+          aws ecs wait services-stable --cluster "$CLUSTER" --services "$SERVICE"
+
+          aws ecs update-service \
+            --cluster "$CLUSTER" \
+            --service "$SERVICE" \
+            --task-definition "$ORIGINAL_TASK_DEFINITION" \
+            --desired-count 1 \
+            --deployment-configuration maximumPercent=200,minimumHealthyPercent=100 \
+            --force-new-deployment >/dev/null
+          aws ecs wait services-stable --cluster "$CLUSTER" --services "$SERVICE"
+          trap - EXIT
+
+          CURRENT_TASK_DEFINITION=$(aws ecs describe-services \
+            --cluster "$CLUSTER" \
+            --services "$SERVICE" \
+            --query 'services[0].taskDefinition' \
+            --output text)
+          test "$CURRENT_TASK_DEFINITION" = "$ORIGINAL_TASK_DEFINITION"
+          echo "Production factory reset completed and the normal service was restored."
