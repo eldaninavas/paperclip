@@ -135,7 +135,7 @@ jobs:
                 .image = $image
                 | del(.entryPoint)
                 | .command = ["sh","-lc",$startCommand]
-                | .environment = ((.environment // []) | map(select(.name != "PGSSLMODE")))
+                | .environment = ((.environment // []) | map(select(.name != "PGSSLMODE" and .name != "BOOTSTRAP_TOKEN_HASH" and .name != "BOOTSTRAP_SCRIPT_B64")))
                 | .healthCheck = {"command":["CMD-SHELL","curl -fsS http://127.0.0.1:3100/api/health || exit 1"],"interval":30,"timeout":5,"retries":3,"startPeriod":90}
               else . end
             )
