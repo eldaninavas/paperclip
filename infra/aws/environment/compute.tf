@@ -43,7 +43,7 @@ resource "aws_ecs_task_definition" "environment" {
     image        = local.image
     essential    = true
     portMappings = [{ containerPort = 3100, protocol = "tcp" }]
-    environment = [
+    environment = concat([
       { name = "NODE_ENV", value = "production" },
       { name = "HOST", value = "0.0.0.0" },
       { name = "PORT", value = "3100" },
@@ -58,7 +58,7 @@ resource "aws_ecs_task_definition" "environment" {
       { name = "PAPERCLIP_MIGRATION_AUTO_APPLY", value = "true" },
       { name = "PAPERCLIP_AUTH_RATE_LIMIT_ENABLED", value = "true" },
       { name = "HEARTBEAT_SCHEDULER_ENABLED", value = "true" }
-    ]
+    ], each.key == "production" ? [{ name = "PGSSLMODE", value = "require" }] : [])
     secrets = [
       { name = "DATABASE_URL", valueFrom = aws_secretsmanager_secret.database_url[each.key].arn },
       { name = "BETTER_AUTH_SECRET", valueFrom = aws_secretsmanager_secret.auth[each.key].arn },

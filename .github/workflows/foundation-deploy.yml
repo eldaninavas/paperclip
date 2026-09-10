@@ -129,7 +129,12 @@ jobs:
         run: |
           aws ecs describe-task-definition --task-definition "$FAMILY" --query taskDefinition > task-definition.json
           jq --arg image "$IMAGE" '
-            .containerDefinitions |= map(if .name == "foundation" then .image = $image else . end)
+            .containerDefinitions |= map(
+              if .name == "foundation" then
+                .image = $image
+                | .environment = ((.environment // []) | map(select(.name != "PGSSLMODE")) + [{"name":"PGSSLMODE","value":"require"}])
+              else . end
+            )
             | del(.taskDefinitionArn,.revision,.status,.requiresAttributes,.compatibilities,.registeredAt,.registeredBy)
           ' task-definition.json > next-task-definition.json
           TASK_ARN=$(aws ecs register-task-definition --cli-input-json file://next-task-definition.json --query taskDefinition.taskDefinitionArn --output text)
