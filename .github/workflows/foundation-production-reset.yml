@@ -59,7 +59,6 @@ jobs:
 
           cat > /tmp/foundation-reset.mjs <<'RESET_SCRIPT'
           import { mkdir, rename, stat, writeFile } from "node:fs/promises";
-          import http from "node:http";
           import postgres from "/app/packages/db/node_modules/postgres/src/index.js";
 
           const EXPECTED_CONFIRMATION = "RESET FOUNDATION PRODUCTION TO ZERO";
@@ -148,16 +147,6 @@ jobs:
             await writeFile(`${archiveRoot}/RESET.json`, `${JSON.stringify(result, null, 2)}\n`, "utf8");
             console.log(`FOUNDATION_RESET_COMPLETE ${JSON.stringify(result)}`);
 
-            const server = http.createServer((request, response) => {
-              if (request.url === "/api/health") {
-                response.writeHead(200, { "content-type": "application/json" });
-                response.end(JSON.stringify({ ok: true, reset: true, remainingRows }));
-                return;
-              }
-              response.writeHead(404);
-              response.end();
-            });
-            server.listen(3100, "0.0.0.0");
           } finally {
             await sql.end({ timeout: 5 });
           }
@@ -168,7 +157,7 @@ jobs:
             --task-definition "$ORIGINAL_TASK_DEFINITION" \
             --query taskDefinition > /tmp/task-definition.json
 
-          RESET_COMMAND='printf "%s" "$FOUNDATION_RESET_SCRIPT_B64" | base64 -d > /tmp/foundation-reset.mjs; exec node /tmp/foundation-reset.mjs'
+          RESET_COMMAND='printf "%s" "$FOUNDATION_RESET_SCRIPT_B64" | base64 -d > /tmp/foundation-reset.mjs; node /tmp/foundation-reset.mjs; case "$DATABASE_URL" in *sslmode=*) ;; *\?*) DATABASE_URL="${DATABASE_URL}&sslmode=require" ;; *) DATABASE_URL="${DATABASE_URL}?sslmode=require" ;; esac; export DATABASE_URL; exec node --import ./server/node_modules/tsx/dist/loader.mjs server/dist/index.js'
           jq \
             --arg script "$RESET_SCRIPT_B64" \
             --arg command "$RESET_COMMAND" '
@@ -188,11 +177,11 @@ jobs:
                           ]
                       )
                     | .healthCheck = {
-                        "command":["CMD-SHELL","curl -fsS http://127.0.0.1:3100/api/health | grep -q \\\"reset\\\":true"],
-                        "interval":10,
+                        "command":["CMD-SHELL","curl -fsS http://127.0.0.1:3100/api/health || exit 1"],
+                        "interval":30,
                         "timeout":5,
                         "retries":3,
-                        "startPeriod":30
+                        "startPeriod":90
                       }
                   else . end
                 )
