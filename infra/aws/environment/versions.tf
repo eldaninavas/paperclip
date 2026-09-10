@@ -19,7 +19,7 @@ provider "aws" {
   default_tags {
     tags = {
       Application = "foundation"
-      Environment = var.environment
+      Environment = "shared"
       ManagedBy   = "terraform"
       Owner       = "davaria"
     }

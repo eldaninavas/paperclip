@@ -72,9 +72,10 @@ jobs:
       - name: Deploy immutable image to development
         env:
           IMAGE: ${{ steps.image.outputs.uri }}
-          CLUSTER: foundation-dev
+          CLUSTER: foundation
           SERVICE: foundation-dev
           FAMILY: foundation-dev
+          TARGET_GROUP: ${{ vars.AWS_TARGET_GROUP_ARN }}
         run: |
           aws ecs describe-task-definition --task-definition "$FAMILY" --query taskDefinition > task-definition.json
           jq --arg image "$IMAGE" '
@@ -84,12 +85,19 @@ jobs:
           TASK_ARN=$(aws ecs register-task-definition --cli-input-json file://next-task-definition.json --query taskDefinition.taskDefinitionArn --output text)
           aws ecs update-service --cluster "$CLUSTER" --service "$SERVICE" --task-definition "$TASK_ARN" --desired-count 1 --force-new-deployment
           aws ecs wait services-stable --cluster "$CLUSTER" --services "$SERVICE"
+          aws elbv2 wait target-in-service --target-group-arn "$TARGET_GROUP"
       - name: Verify development health through Cloudflare Access
         env:
           HEALTH_URL: https://dev.foundation.davaria.app/api/health
         run: |
           STATUS=$(curl --silent --output /dev/null --write-out '%{http_code}' "$HEALTH_URL")
           test "$STATUS" = "302" || test "$STATUS" = "401"
+      - name: Scale development back to zero
+        if: always()
+        env:
+          CLUSTER: foundation
+          SERVICE: foundation-dev
+        run: aws ecs update-service --cluster "$CLUSTER" --service "$SERVICE" --desired-count 0
 
   deploy-production:
     if: github.event_name == 'workflow_dispatch' && inputs.deploy_production
@@ -104,7 +112,7 @@ jobs:
       - name: Promote tested image to production
         env:
           IMAGE: ${{ needs.build-and-deploy-development.outputs.image }}
-          CLUSTER: foundation-prod
+          CLUSTER: foundation
           SERVICE: foundation-prod
           FAMILY: foundation-prod
         run: |

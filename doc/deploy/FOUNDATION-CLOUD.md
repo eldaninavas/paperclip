@@ -1,72 +1,73 @@
 # Foundation cloud environments
 
-Foundation has three deliberately separate execution contexts:
+Foundation has three independent execution contexts:
 
-| Environment | Address | Data | Entry point |
+| Environment | Address | Runtime | Data |
 |---|---|---|---|
-| Local | `http://127.0.0.1:3100` | Embedded/local PostgreSQL | Loopback only |
-| Development | `https://dev.foundation.davaria.app` | Dedicated RDS + EFS | Cloudflare Access + Tunnel |
-| Production | `https://foundation.davaria.app` | Dedicated RDS + EFS | Cloudflare Access + Tunnel |
+| Local | `http://127.0.0.1:3100` | Local process | Local PostgreSQL |
+| Development | `https://dev.foundation.davaria.app` | Fargate, normally scaled to zero | Ephemeral PostgreSQL sidecar + isolated EFS path |
+| Production | `https://foundation.davaria.app` | Fargate, one task | Private RDS PostgreSQL + isolated EFS path |
 
-Development and production do not share a VPC, database, filesystem, secrets,
-ECS cluster, service, task roles, logs, or Cloudflare tunnel. They share only an
-immutable ECR image repository. Application data never enters that repository.
+Development and production have separate ECS services, task definitions,
+security groups, secrets, IAM roles, logs, filesystems paths, databases and
+GitHub environments. They share an immutable ECR repository, ECS cluster, VPC
+and ingress load balancer to stay within the pre-revenue budget.
 
 ## Network boundary
 
-Each AWS environment is deployed in `mx-central-1` and spans two availability
-zones. ECS receives an ephemeral egress address, but its security group has no
-inbound rules at all. RDS and EFS run in data subnets with no internet route.
-Cloudflare Tunnel originates the connection from the ECS task, so there is no
-public load balancer, open application port, or reachable origin that bypasses
-Cloudflare Access.
+The shared Application Load Balancer uses
+`dualstack-without-public-ipv4`. It is reachable from the Internet only over
+IPv6 and its security group accepts HTTPS only from Cloudflare's published IPv6
+origin ranges. Cloudflare Access is therefore the public identity boundary, but
+Foundation does not depend on Cloudflare Tunnel.
 
-This design intentionally avoids a fixed NAT Gateway charge in each environment
-while the product is pre-revenue. Moving ECS behind NAT later does not improve
-the current ingress boundary—the security group already rejects every inbound
-connection—but it can be enabled when a fixed outbound IP or a stricter network
-compliance profile justifies the cost.
+The ALB routes by hostname to separate target groups. Fargate tasks accept port
+3100 only from the ALB security group. RDS and EFS live in data subnets without
+an Internet route; RDS accepts PostgreSQL only from the production service.
+Tasks receive temporary public egress so images and provider endpoints remain
+reachable without a fixed NAT Gateway charge. Those addresses are never used as
+the application entry point.
 
 ## Identity boundary
 
-Cloudflare Access is the outer identity gate. Initially, both applications use
-email one-time PIN authentication and allow only `daniel.navasp24@gmail.com`.
-Foundation still runs in `authenticated/public` mode behind that gate; Cloudflare
-Access is not used as a replacement for Foundation's own session and audit model.
+Cloudflare Access initially allows only `daniel.navasp24@gmail.com` through
+email one-time PIN authentication. Foundation retains its own authenticated
+deployment mode for application sessions and audit records.
 
-GitHub Actions uses AWS OIDC. There are no permanent AWS access keys in GitHub.
-The trust policy is bound to `eldaninavas/paperclip` and to the exact GitHub
-environment name. Development cannot assume the production role.
+GitHub Actions authenticates to AWS with OIDC. No permanent AWS access key is
+stored in GitHub. The development and production roles trust only their exact
+GitHub environment in `eldaninavas/paperclip`.
 
 ## Deployment behavior
 
-- Every push to `master` verifies, builds and deploys development.
-- Production is a manual promotion of the exact image already deployed to dev.
-- The GitHub `production` environment must require Daniel as reviewer.
-- ECS deployment circuit breakers automatically roll back a failed rollout.
-- ECR tags are immutable and old task-definition revisions remain available for
-  an explicit rollback.
+1. A push to `master` verifies the monorepo and creates an immutable ARM64 image.
+2. Development scales from zero, deploys that image and must become healthy in
+   its ALB target group.
+3. Development scales back to zero even when validation fails.
+4. A manual production run promotes the exact image that passed development.
+5. The production GitHub environment requires Daniel's approval.
+6. ECS deployment circuit breakers retain the previous task revision and roll
+   back failed deployments automatically.
 
-## Bootstrap sequence
+## Cost boundary
 
-1. Apply `infra/aws/bootstrap` once from an authenticated administrator session.
-2. Create the Cloudflare tunnels and Access policies for both hostnames.
-3. Apply `infra/aws/environment` once for development and once for production.
-4. Put each tunnel token in its matching AWS Secrets Manager secret.
-5. Configure the GitHub environment variables from Terraform outputs.
-6. Run `Foundation deploy`; validate development; approve the production gate.
+Only production runs continuously. Development compute and its PostgreSQL
+sidecar exist only during validation. Production uses one Single-AZ
+`db.t4g.micro`; the ALB has no billable public IPv4 addresses; container
+insights and RDS Performance Insights are disabled. AWS Budgets must alert at
+USD 35 and USD 45 against a USD 50 monthly operating ceiling.
 
-Do not place model-provider keys in the infrastructure repository. Bedrock or
-other runtime credentials belong to the ECS task role or environment-scoped
-Secrets Manager entries when that runtime is intentionally enabled.
+## Bootstrap
 
-## Local
+1. Apply `infra/aws/bootstrap` once from an administrator session.
+2. Request an ACM certificate for both Foundation hostnames and validate it in
+   Cloudflare DNS.
+3. Copy `foundation.tfvars.example` outside the repository, fill the bootstrap
+   outputs and certificate ARN, then apply `infra/aws/environment` once.
+4. Proxy both hostnames to the ALB hostname in Cloudflare.
+5. Enable Cloudflare Access and allow only the authorized Gmail address.
+6. Configure GitHub environment variables from Terraform outputs.
+7. Run the deployment workflow and approve the production promotion.
 
-The local environment remains unchanged:
-
-```sh
-pnpm install
-pnpm dev
-```
-
-Local state and authentication are never promoted into development or production.
+Provider credentials are not committed. Future Bedrock or API credentials use
+the task role or environment-scoped Secrets Manager entries.
