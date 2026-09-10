@@ -1,0 +1,45 @@
+name: Foundation bootstrap first admin
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: foundation-bootstrap-admin
+  cancel-in-progress: false
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: mx-central-1
+      - name: Install one-time first-admin invite
+        env:
+          BOOTSTRAP_HASH: d27ec4116ef86174c2c6ae66097aa6e67a73139a7f067a7fbdb0b37720ebf828
+          BOOTSTRAP_SCRIPT_B64: aW1wb3J0IHBvc3RncmVzIGZyb20gIi4vcGFja2FnZXMvZGIvbm9kZV9tb2R1bGVzL3Bvc3RncmVzL3NyYy9pbmRleC5qcyI7CmNvbnN0IHNxbD1wb3N0Z3Jlcyhwcm9jZXNzLmVudi5EQVRBQkFTRV9VUkwpOwpjb25zdCBoYXNoPXByb2Nlc3MuZW52LkJPT1RTVFJBUF9UT0tFTl9IQVNIOwphd2FpdCBzcWwudW5zYWZlKCJVUERBVEUgaW52aXRlcyBTRVQgcmV2b2tlZF9hdD1OT1coKSwgdXBkYXRlZF9hdD1OT1coKSBXSEVSRSBpbnZpdGVfdHlwZT0nYm9vdHN0cmFwX2NlbycgQU5EIGFjY2VwdGVkX2F0IElTIE5VTEwgQU5EIHJldm9rZWRfYXQgSVMgTlVMTCBBTkQgdG9rZW5faGFzaCA8PiAkMSIsW2hhc2hdKTsKYXdhaXQgc3FsLnVuc2FmZSgiSU5TRVJUIElOVE8gaW52aXRlcyAoaW52aXRlX3R5cGUsdG9rZW5faGFzaCxhbGxvd2VkX2pvaW5fdHlwZXMsZXhwaXJlc19hdCxpbnZpdGVkX2J5X3VzZXJfaWQpIFZBTFVFUyAoJ2Jvb3RzdHJhcF9jZW8nLCQxLCdodW1hbicsTk9XKCkrSU5URVJWQUwgJzcyIGhvdXJzJywnc3lzdGVtJykgT04gQ09ORkxJQ1QgKHRva2VuX2hhc2gpIERPIE5PVEhJTkciLFtoYXNoXSk7CmF3YWl0IHNxbC5lbmQoe3RpbWVvdXQ6NX0pOw==
+        run: |
+          aws ecs describe-task-definition --task-definition foundation-prod --query taskDefinition > task-definition.json
+          START_COMMAND='case "$DATABASE_URL" in *sslmode=*) ;; *\?*) DATABASE_URL="${DATABASE_URL}&sslmode=require" ;; *) DATABASE_URL="${DATABASE_URL}?sslmode=require" ;; esac; export DATABASE_URL; node --input-type=module -e "$(printf %s "$BOOTSTRAP_SCRIPT_B64" | base64 -d)"; exec node --import ./server/node_modules/tsx/dist/loader.mjs server/dist/index.js'
+          jq --arg hash "$BOOTSTRAP_HASH" --arg script "$BOOTSTRAP_SCRIPT_B64" --arg startCommand "$START_COMMAND" '
+            .containerDefinitions |= map(
+              if .name == "foundation" then
+                del(.entryPoint)
+                | .command = ["sh","-lc",$startCommand]
+                | .environment = ((.environment // []) | map(select(.name != "BOOTSTRAP_TOKEN_HASH" and .name != "BOOTSTRAP_SCRIPT_B64")) + [
+                    {"name":"BOOTSTRAP_TOKEN_HASH","value":$hash},
+                    {"name":"BOOTSTRAP_SCRIPT_B64","value":$script}
+                  ])
+              else . end
+            )
+            | del(.taskDefinitionArn,.revision,.status,.requiresAttributes,.compatibilities,.registeredAt,.registeredBy)
+          ' task-definition.json > next-task-definition.json
+          TASK_ARN=$(aws ecs register-task-definition --cli-input-json file://next-task-definition.json --query taskDefinition.taskDefinitionArn --output text)
+          aws ecs update-service --cluster foundation --service foundation-prod --task-definition "$TASK_ARN" --desired-count 1 --force-new-deployment
+          aws ecs wait services-stable --cluster foundation --services foundation-prod
