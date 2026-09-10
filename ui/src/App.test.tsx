@@ -5,7 +5,7 @@ import { flushSync } from "react-dom";
 import { createRoot } from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { CloudAccessGate } from "./components/CloudAccessGate";
+import { CloudAccessGate, cloudAccessHealthRefetchInterval } from "./components/CloudAccessGate";
 import appSource from "./App.tsx?raw";
 
 const mockHealthApi = vi.hoisted(() => ({
@@ -98,6 +98,18 @@ describe("CloudAccessGate", () => {
     container.remove();
     document.body.innerHTML = "";
     vi.clearAllMocks();
+  });
+
+  it("keeps revalidating authenticated instances after initial setup", () => {
+    expect(cloudAccessHealthRefetchInterval({
+      deploymentMode: "authenticated",
+      bootstrapStatus: "ready",
+    })).toBe(5000);
+    expect(cloudAccessHealthRefetchInterval({
+      deploymentMode: "authenticated",
+      bootstrapStatus: "bootstrap_pending",
+    })).toBe(2000);
+    expect(cloudAccessHealthRefetchInterval({ deploymentMode: "local_trusted" })).toBe(false);
   });
 
   it("shows a no-access message for signed-in users without org access", async () => {

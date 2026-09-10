@@ -9,6 +9,16 @@ import { BootstrapPendingPage } from "@/components/BootstrapPendingPage";
 import { PaperclipLoading } from "@/components/AnimatedPaperclipIcon";
 import { Card } from "@/components/ui/card";
 
+type GateHealthSnapshot = {
+  deploymentMode?: "local_trusted" | "authenticated";
+  bootstrapStatus?: "ready" | "bootstrap_pending";
+};
+
+export function cloudAccessHealthRefetchInterval(data: GateHealthSnapshot | undefined): number | false {
+  if (data?.deploymentMode !== "authenticated") return false;
+  return data.bootstrapStatus === "bootstrap_pending" ? 2000 : 5000;
+}
+
 function NoBoardAccessPage() {
   return (
     <div className="mx-auto max-w-xl py-10">
@@ -33,13 +43,16 @@ export function CloudAccessGate() {
     queryKey: queryKeys.health,
     queryFn: () => healthApi.get(),
     retry: false,
+    staleTime: 0,
     refetchInterval: (query) => {
-      const data = query.state.data as
-        | { deploymentMode?: "local_trusted" | "authenticated"; bootstrapStatus?: "ready" | "bootstrap_pending" }
-        | undefined;
-      return data?.deploymentMode === "authenticated" && data.bootstrapStatus === "bootstrap_pending"
-        ? 2000
-        : false;
+      const data = query.state.data as GateHealthSnapshot | undefined;
+      // An authenticated instance may be factory-reset while a board tab is
+      // still open. The reset deletes the server session, companies and admin
+      // role, but React Query would otherwise keep rendering that old shell
+      // indefinitely because a ready instance did not poll health. Revalidate
+      // both ready and bootstrap-pending instances so an open tab leaves the
+      // deleted tenant and returns to first-admin setup without a manual reload.
+      return cloudAccessHealthRefetchInterval(data);
     },
     refetchIntervalInBackground: true,
   });
@@ -51,6 +64,9 @@ export function CloudAccessGate() {
     queryFn: () => authApi.getSession(),
     enabled: isAuthenticatedMode,
     retry: false,
+    staleTime: 0,
+    refetchInterval: isAuthenticatedMode ? 5000 : false,
+    refetchIntervalInBackground: true,
   });
 
   const boardAccessQuery = useQuery({
