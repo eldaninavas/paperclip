@@ -2778,6 +2778,8 @@ describe("TaskChatThread live transcript", () => {
     const phaseSummary = tail!.querySelector<HTMLButtonElement>(
       '[data-testid="task-chat-phase-summary"]',
     );
+    expect(phaseSummary?.getAttribute("aria-expanded")).toBe("false");
+    act(() => phaseSummary?.click());
     expect(phaseSummary?.getAttribute("aria-expanded")).toBe("true");
     expect(tail!.textContent).toContain("src/app.ts");
     // None of the debug plumbing reaches the thread.
