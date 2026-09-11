@@ -154,6 +154,25 @@ políticas basadas en recurso.
 
 Para que yo pueda hacerlo sin ti la próxima vez, añade a `FoundationAgentCoreProvisioning` un statement con `iam:PutRolePolicy`/`GetRolePolicy`/`DeleteRolePolicy` sobre `arn:aws:iam::523859314550:role/foundation-*-ecs-task`. No es admin: sigue sin poder tocar ECS, RDS ni crear roles nuevos.
 
+### RIESGO ABIERTO: aislamiento entre tenants en la ejecución
+
+Con esta configuración, el modelo y la facturación quedan resueltos, **pero la
+ejecución no está aislada entre tenants**. Los `environments` tienen driver
+`local` por defecto, y `local` significa *dentro del contenedor ECS*: los agentes
+de todas las companies comparten proceso, filesystem y red de la misma task.
+
+Concretamente, hoy:
+- El output de cada tenant sí queda separado en S3 (`run-logs/<companyId>/...`).
+- El ledger sí atribuye tokens y costo por company.
+- **El workspace no está separado.** Un agente con acceso a shell puede leer el
+  directorio de trabajo de otro tenant dentro del mismo contenedor.
+
+Esto es aceptable mientras el único usuario seas tú. **No lo es en cuanto entre
+el primer cliente real.** Cerrarlo requiere elegir y contratar un sandbox
+provider (cloudflare, daytona, e2b, kubernetes, modal, novita), que es la
+decisión de costo pendiente, y poner `enableManagedSandboxOnly` para que ningún
+run caiga al driver `local`.
+
 ### Detalle a vigilar: catálogo de modelos vs. región
 
 `packages/adapters/claude-local/src/server/models.ts` publica modelos Bedrock con
