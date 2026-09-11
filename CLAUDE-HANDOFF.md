@@ -286,6 +286,23 @@ Costo ~$1/mes (KMS). `aws-agentcore.sh destroy` lo apaga.
   `foundation-prod-ecs-task`. Deny explícito sobre ECS/RDS/ELB/EC2, creación de
   usuarios y llaves. No es admin y no debe convertirse en admin.
 
+#### Por qué dev siempre respondía 503 (resuelto)
+
+No era un fallo del despliegue. `foundation-deploy.yml` **apaga dev a propósito**
+al terminar (`Scale development back to zero`), porque una task encendida cobra
+y el presupuesto es de ~USD 50/mes. La task arrancaba, pasaba su health check a
+través de Cloudflare, y desaparecía antes de que nadie pudiera usarla.
+
+Ahora el dispatch acepta `keep_development_running`. Con eso dev queda arriba
+para probar; sin eso, todo sigue igual que antes. **Si lo usas, dev cobra hasta
+que otro deploy (sin la bandera) lo baje.**
+
+```
+gh workflow run foundation-deploy.yml --repo eldaninavas/paperclip \
+  --ref foundation-cloud-bedrock -f deploy_production=false \
+  -f keep_development_running=true
+```
+
 **Falta en prod:** la misma política `FoundationCloudBedrockInvoke` sobre
 `foundation-prod-ecs-task`. Es aditiva y no toca el servicio en marcha, pero es
 un cambio en producción y queda a tu autorización:
