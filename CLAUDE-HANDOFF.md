@@ -416,6 +416,21 @@ ejecución tiene Bedrock y Marketplace, el contexto se sube cifrado, el endpoint
 está `READY` en v2, y `allowedTools` admite el contrato. Con todo eso, un harness
 sano debería emitir al menos `messageStart`.
 
+**Descartado también el endpoint.** Repetí la prueba con el endpoint `DEFAULT`
+del harness, con el `paperclip` que creamos, y sin `qualifier`. Los tres, con un
+mensaje trivial (`"Di OK"`) y **sin herramientas**, devuelven exactamente lo
+mismo:
+
+```
+qualifier=DEFAULT  → [19.7s] messageStop / max_iterations_exceeded — 1 evento
+qualifier=paperclip→ [17.5s] messageStop / max_iterations_exceeded — 1 evento
+sin qualifier      → [21.0s] messageStop / max_iterations_exceeded — 1 evento
+```
+
+Es decir: no depende del endpoint, ni de las herramientas, ni del contrato de
+completación, ni de nada que hayamos configurado nosotros. **Un harness recién
+creado no responde a un "Di OK".** Ése es el repro para AWS, y cabe en un párrafo.
+
 **Lo que yo haría a continuación, por orden de coste:**
 1. Abrir un caso con AWS Support con esta traza: *"InvokeHarness returns only
    messageStop/max_iterations_exceeded, no content events, while Memory shows
