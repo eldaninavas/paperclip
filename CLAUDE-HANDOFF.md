@@ -312,6 +312,22 @@ Costo ~$1/mes (KMS). `aws-agentcore.sh destroy` lo apaga.
   `foundation-prod-ecs-task`. Deny explícito sobre ECS/RDS/ELB/EC2, creación de
   usuarios y llaves. No es admin y no debe convertirse en admin.
 
+#### Qué significa "harness por tenant_id", en concreto
+
+Revisado a fondo, porque era tu pregunta original. Cuatro piezas, tres ya
+aisladas por tenant y una que hubo que arreglar:
+
+| Pieza | Cómo se separa hoy |
+|---|---|
+| Perfil de AgentCore (harness, memory, bucket, rol) | Fila por `company_id` en `remote_agent_profiles`. Cada tenant puede apuntar a su propio harness sin tocar código. |
+| Run logs en S3 | `run-logs/<companyId>/<agentId>/<runId>.ndjson`, y la lectura verifica que la clave sea del tenant que pregunta. |
+| Memoria de AgentCore | `actor_id = paperclip-<sha(session_id)>`, con `session_id` aleatorio por sesión. Los eventos se listan y borran por `(session_id, actor_id)`, así que dos tenants sobre el mismo Memory no se cruzan. Lo que sí comparten es cuota y retención. |
+| Contexto de ejecución en S3 | **Era el hueco.** Un solo `contextPrefix` para todo el deployment. Ahora un perfil se rechaza si su prefijo no lleva el `company_id` como segmento. |
+
+Lo que **no** separa nada de esto es el proceso: todos los agentes corren dentro
+de la misma task de ECS. Ver *RIESGO ABIERTO* más abajo; eso sigue necesitando un
+sandbox provider.
+
 #### Dos fugas de ingreso encontradas en el camino de tokens
 
 Ninguna daba error. Las dos hacían que Foundation le pagara a Amazon tokens que
