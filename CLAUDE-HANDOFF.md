@@ -438,7 +438,7 @@ Lo que **no** separa nada de esto es el proceso: todos los agentes corren dentro
 de la misma task de ECS. Ver *RIESGO ABIERTO* más abajo; eso sigue necesitando un
 sandbox provider.
 
-#### Dos fugas de ingreso encontradas en el camino de tokens
+#### Tres fugas de ingreso encontradas en el camino de tokens
 
 Ninguna daba error. Las dos hacían que Foundation le pagara a Amazon tokens que
 ningún tenant ve en su factura.
@@ -455,8 +455,15 @@ ningún tenant ve en su factura.
    **nunca leía ese campo**: todo lo que una sesión gastara construyendo su
    cache se perdía antes de llegar al ledger.
 
-Las dos quedan sumadas a `inputTokens`, que es lo que ya hacía el adaptador
-local. Bedrock cobra la escritura de cache algo por encima del input ($3.75
+3. **El mismo run se describía de dos formas.** Dos sitios decidían el precio y
+   sólo uno conocía Bedrock: `cost_events` pasaba por el rate card y guardaba
+   `reported` con centavos reales, mientras el `usageJson` del propio run leía
+   sólo el adapter y guardaba `unpriced`. El detalle del run es lo primero que
+   mira alguien cuando se cuestiona un cargo. Ahora los dos llaman a
+   `resolveBilledCostUsd`, que es la regla escrita una vez.
+
+Las dos primeras quedan sumadas a `inputTokens`, que es lo que ya hacía el
+adaptador local. Bedrock cobra la escritura de cache algo por encima del input ($3.75
 contra $3 por millón en Sonnet 4.6), así que todavía se factura ~20% por debajo
 en esos tokens concretos — contra 100% por debajo antes. El arreglo exacto
 necesita una columna en `cost_events` para que la fila siga siendo recomputable;
