@@ -120,7 +120,7 @@ jobs:
                         {"name":"FOUNDATION_CLOUD_EXECUTION","value":"true"},
                         # Claude Code talks to Bedrock instead of api.anthropic.com.
                         # Bedrock is available in mx-central-1, the same region as
-                        # this cluster, so a tenant's tokens never leave the region
+                        # this cluster, so tenant tokens never leave the region
                         # the service runs in.
                         {"name":"CLAUDE_CODE_USE_BEDROCK","value":"1"},
                         {"name":"AWS_REGION","value":"mx-central-1"}
@@ -134,7 +134,7 @@ jobs:
                         # defaults to true for S3-compatible endpoints.
                         {"name":"RUN_LOG_S3_FORCE_PATH_STYLE","value":"false"},
                         # Mirror the tail every 30s so a rolled task loses at
-                        # most half a minute of a tenant's agent output.
+                        # most half a minute of agent output for one tenant.
                         {"name":"RUN_LOG_S3_INFLIGHT_MIRROR_SECONDS","value":"30"}
                       ] end)
                   )
