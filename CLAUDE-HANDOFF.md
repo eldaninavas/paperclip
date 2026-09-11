@@ -149,6 +149,22 @@ Para que yo pueda hacerlo sin ti la próxima vez, añade a
 `arn:aws:iam::523859314550:role/foundation-*-ecs-task`. No es admin: sigue sin
 poder tocar ECS, RDS ni crear roles nuevos.
 
+### Por qué la verificación final también te necesita a ti
+
+Aunque apliques la política de Bedrock, yo no puedo cerrar el ciclo solo. Dos
+barreras, ambas deliberadas y ambas tuyas:
+
+1. **ECS:** `foundation-dev` queda en `desired-count 0` al final de cada deploy,
+   y mi usuario tiene `explicitDeny` sobre `ecs:UpdateService`, `DescribeServices`
+   y `RunTask` — el Deny que protege producción. No puedo levantar el servicio
+   para ejecutar un agente.
+2. **Cloudflare Access:** la UI de dev y prod está restringida a tu cuenta de
+   Gmail. No puedo abrir la aplicación ni disparar un run desde la interfaz.
+
+No son fallos: son las protecciones que pediste, funcionando. Pero implican que
+el último tramo (ejecutar un agente y ver la fila en `cost_events`) lo haces tú,
+o me amplías esos dos accesos a sabiendas de lo que significan.
+
 ### Pendiente después de desbloquear
 
 1. Escalar `foundation-dev` a 1 (el deploy lo apaga al terminar) y ejecutar un agente.
