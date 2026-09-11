@@ -15,6 +15,7 @@ import {
 import { getCloudRuntimeIdentity } from "../services/cloud-runtime-identity.js";
 import { getHiddenSettings } from "../services/settings-visibility.js";
 import { describeBedrockBillingReadiness } from "../services/bedrock-pricing.js";
+import { runLogMirrorHealth } from "../services/run-log-store.js";
 import {
   inspectDatabaseBackupHealth,
   type DatabaseBackupHealthStatus,
@@ -181,6 +182,11 @@ export function healthRoutes(
     // every tenant zero, so it is reported next to the feature flag that turned
     // Bedrock on rather than discovered on an invoice.
     const foundationCloudBilling = describeBedrockBillingReadiness(runtimeEnv);
+    // Run logs mirror to object storage best-effort, so a mirror broken by bad
+    // credentials or a denied bucket policy is otherwise silent until a task
+    // roll takes the local copies with it. Counts only: object keys carry
+    // tenant and run ids.
+    const runLogMirror = runLogMirrorHealth();
     // serverInfo (git SHA + process start) rides on the full-details responses
     // only, so it reaches board/agent actors in authenticated mode or any caller
     // in local_trusted dev — never anonymous authenticated callers. The
@@ -357,6 +363,7 @@ export function healthRoutes(
           runtimeEnv.FOUNDATION_CLOUD_EXECUTION,
         ),
         ...(foundationCloudBilling ? { foundationCloudBilling } : {}),
+        ...(runLogMirror.configured ? { runLogMirror } : {}),
       },
       serverInfo,
       ...(databaseBackup ? { databaseBackup } : {}),

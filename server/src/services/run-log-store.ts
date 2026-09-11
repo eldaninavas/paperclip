@@ -121,11 +121,63 @@ export interface DurableRunLogStoreOptions {
 // the whole in-flight log. Finalize retires the in-flight bookkeeping (waiting
 // out any upload already on the wire) before writing the complete file, so a
 // stale partial can never overwrite a finalized log.
+/**
+ * Health of the object-storage mirror, for the health endpoint.
+ *
+ * Mirroring is best-effort on purpose: a failed upload must not fail a run, and
+ * the local file still answers reads until the task rolls. The cost of that
+ * choice is that a mirror broken by bad credentials, a missing bucket or a
+ * denied policy is completely silent -- it shows up as lost tenant output after
+ * the next deploy, which is exactly when nobody can tell what happened.
+ *
+ * Counts only, no keys: the object key carries tenant and run ids, and this is
+ * read by anything that can reach the health endpoint.
+ */
+export interface RunLogMirrorHealth {
+  configured: boolean;
+  uploads: number;
+  failures: number;
+  consecutiveFailures: number;
+  lastFailureAt: string | null;
+  lastFailureReason: string | null;
+}
+
+const mirrorHealth: RunLogMirrorHealth = {
+  configured: false,
+  uploads: 0,
+  failures: 0,
+  consecutiveFailures: 0,
+  lastFailureAt: null,
+  lastFailureReason: null,
+};
+
+function noteMirrorSuccess(): void {
+  mirrorHealth.uploads += 1;
+  mirrorHealth.consecutiveFailures = 0;
+}
+
+function noteMirrorFailure(error: unknown): void {
+  mirrorHealth.failures += 1;
+  mirrorHealth.consecutiveFailures += 1;
+  mirrorHealth.lastFailureAt = new Date().toISOString();
+  // Name and a short message: enough to tell AccessDenied from NoSuchBucket
+  // from a timeout, without pulling a signed URL or a key into the response.
+  const name = error instanceof Error ? error.name : "Error";
+  const message = error instanceof Error ? error.message : String(error);
+  mirrorHealth.lastFailureReason = `${name}: ${message}`.slice(0, 200);
+}
+
+/** Current mirror health. Safe to call before any store exists. */
+export function runLogMirrorHealth(): RunLogMirrorHealth {
+  return { ...mirrorHealth };
+}
+
 export function createDurableRunLogStore(options: DurableRunLogStoreOptions): RunLogStore {
   const { basePath } = options;
   const s3 = options.s3;
   const s3Prefix = normalizeKeyPrefix(s3?.keyPrefix);
   const inflightMirrorMs = s3?.inflightMirrorMs && s3.inflightMirrorMs > 0 ? s3.inflightMirrorMs : 0;
+  mirrorHealth.configured = Boolean(s3);
 
   function s3Key(logRef: string): string {
     return s3Prefix ? `${s3Prefix}/${logRef}` : logRef;
@@ -161,10 +213,12 @@ export function createDurableRunLogStore(options: DurableRunLogStoreOptions): Ru
         contentType: "application/x-ndjson",
         contentLength: stat.size,
       });
+      noteMirrorSuccess();
       return true;
     })().catch((err) => {
       // Best-effort like the finalize mirror: a failing upload must never
       // break the run, but a persistently broken mirror should be visible.
+      noteMirrorFailure(err);
       console.warn(
         `[run-log-store] Failed to mirror in-flight run log to object storage (key: ${s3Key(logRef)}):`,
         err,
@@ -348,7 +402,9 @@ export function createDurableRunLogStore(options: DurableRunLogStoreOptions): Ru
             contentType: "application/x-ndjson",
             contentLength: stat.size,
           });
+          noteMirrorSuccess();
         } catch (err) {
+          noteMirrorFailure(err);
           // Best-effort: finalization must not break, but a persistently
           // failing mirror (bad creds/bucket/endpoint) should be visible to
           // operators before a pod roll makes the logs unreadable.
