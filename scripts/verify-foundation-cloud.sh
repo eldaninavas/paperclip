@@ -123,6 +123,19 @@ f=sys.argv[1]
 print(d.get('features',{}).get(f, d.get(f,'—')))" "$field" 2>/dev/null)"
       note "${field}: ${value}"
     done
+    # The instance reports whether its configured model has a rate in the
+    # ledger. An unpriced model is the one failure that leaves no trace: runs
+    # succeed and every tenant is billed zero, so it is asserted rather than
+    # printed.
+    billing="$(printf '%s' "$body" | python3 -c "
+import json,sys
+b=json.load(sys.stdin).get('features',{}).get('foundationCloudBilling')
+print('' if b is None else f\"{b.get('priced')}|{b.get('model')}\")" 2>/dev/null)"
+    case "$billing" in
+      True\|*)  ok "modelo facturable: ${billing#*|}" ;;
+      False\|*) bad "modelo SIN tarifa (${billing#*|}): cada run se registraría a 0 centavos" ;;
+      *)        note "la instancia no reporta foundationCloudBilling (imagen anterior a este cambio)" ;;
+    esac
   else
     bad "${HOST} no devolvió salud con el service token (¿token sin acceso a esta app?)"
   fi
