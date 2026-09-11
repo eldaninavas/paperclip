@@ -83,6 +83,32 @@ No es que la cuenta no haya pedido cuota: **AWS puso la cuenta en cero por
 encima de su propio valor por defecto.** Eso es un estado de cuenta, no una
 configuración nuestra, y no hay forma de arreglarlo desde el código.
 
+### Por qué: la cuenta tiene 40 horas y AWS no la sembró con sus defaults
+
+```
+AccountCreatedDate: 2026-09-10T03:17:05+00:00     (≈40 h al momento de escribir)
+AccountName:        Davaria Foundation
+Soporte:            Basic
+```
+
+Es un **bug de aprovisionamiento conocido de Bedrock en cuentas nuevas**: en vez
+de heredar los valores por defecto de AWS, todas las cuotas del catálogo quedan
+en 0, para todos los modelos y todos los proveedores. Coincide exactamente con
+lo que medimos: aplicado 0 contra un default de 8 640 000 000, en seis
+proveedores distintos, y `ThrottlingException` en la primera petición del día.
+
+Reportes del mismo caso en AWS re:Post:
+
+- [provisioning bug — account-level quota for new account is set to 0 for every model](https://repost.aws/questions/QULJwtdJfQTIGbM3SHsJuRpA/provisioning-bug-aws-bedrock-account-level-quota-for-new-account-is-set-to-0-for-every-model)
+- [New account ThrottlingException on first ever Bedrock request](https://repost.aws/questions/QUd5AaKGpPTISWsLepQA2Wag/new-account-throttlingexception-on-first-ever-bedrock-request-quota-shows-5m-tpm-but-zero-tokens-allowed)
+- [All Bedrock model quotas stuck at 0 tokens/day](https://repost.aws/questions/QUt6wvrkLHQwq6yq52nVADvA/all-bedrock-model-quotas-stuck-at-0-tokens-day-cannot-make-any-api-calls)
+- [Bedrock Claude Opus 4.6 stuck at 0 tokens-per-day quota](https://repost.aws/questions/QUNLrkvWGeQVWFffdDrda90Q/bedrock-claude-opus-4-6-stuck-at-0-tokens-per-day-quota-throttling-exception-on-every-call)
+
+**Lo bueno:** no es un bloqueo contra Davaria ni un error nuestro, y se resuelve
+con un caso de soporte. **Lo que hay que saber:** en varios de esos reportes AWS
+tardó días y en algunos rechazó la petición *por poca actividad en la cuenta*.
+Conviene abrir el caso ya y no esperar a tener clientes.
+
 ### Lo que ya se intentó por autoservicio, y por qué no alcanza
 
 1. **Formulario de caso de uso** (`bedrock:PutUseCaseForModelAccess`, el mismo
