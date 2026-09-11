@@ -104,6 +104,23 @@ Reportes del mismo caso en AWS re:Post:
 - [All Bedrock model quotas stuck at 0 tokens/day](https://repost.aws/questions/QUt6wvrkLHQwq6yq52nVADvA/all-bedrock-model-quotas-stuck-at-0-tokens-day-cannot-make-any-api-calls)
 - [Bedrock Claude Opus 4.6 stuck at 0 tokens-per-day quota](https://repost.aws/questions/QUNLrkvWGeQVWFffdDrda90Q/bedrock-claude-opus-4-6-stuck-at-0-tokens-per-day-quota-throttling-exception-on-every-call)
 
+**Y la prueba de que es exactamente eso, un fallo de aprovisionamiento y no una
+cuenta congelada:** AWS sembró unas familias de cuota y dejó otra entera en cero,
+en las tres regiones.
+
+```
+us-east-1     Claude / batch inference        66/66 con valor
+              Claude / model customization      2/2 con valor
+              Claude / on-demand cross-region   0/33   ← todas en cero
+mx-central-1  batch 36/36 con valor   |   on-demand 0/30
+us-west-2     batch 66/66 con valor   |   on-demand 0/33
+```
+
+Si la cuenta estuviera congelada por verificación, por pago o por abuso, las 184
+cuotas de Claude estarían en cero. 68 tienen valores normales. Lo que falta es
+**una sola familia**: inferencia on-demand. Eso es el bug, y es el argumento más
+fuerte para el caso de soporte.
+
 **Lo bueno:** no es un bloqueo contra Davaria ni un error nuestro, y se resuelve
 con un caso de soporte. **Lo que hay que saber:** en varios de esos reportes AWS
 tardó días y en algunos rechazó la petición *por poca actividad en la cuenta*.
@@ -174,6 +191,12 @@ abajo sobra.
 > Sonnet 4.6) has an AWS default of 8,640,000,000 and an applied value of 0, and
 > is not adjustable. `L-7BEE40FB` (tokens per minute, same model) has a default
 > of 6,000,000 and an applied value of 0.
+>
+> The gap is confined to one quota family. Of 184 Claude quotas in us-east-1, 68
+> carry normal values -- all 66 batch inference quotas and both model
+> customization quotas -- while all 33 on-demand cross-region inference quotas
+> are 0. The same split appears in us-west-2 and mx-central-1. This does not look
+> like an account-level hold; it looks like one family that was never seeded.
 >
 > A self-service increase is refused because the requested value must exceed the
 > default, which the account does not currently have. Model access shows
