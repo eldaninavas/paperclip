@@ -342,8 +342,31 @@ provider remoto todavía no llega a anunciarse en el tiempo disponible.
 fases no son estables entre intentos: conviene verificar primero que el
 transporte PRP se establece antes de seguir mirando AgentCore.
 
-**Siguiente hilo:** instrumentar qué hace el runnerd entre que arranca el
-provider AgentCore y que reporta identidad — probablemente sigue esperando la
+### CONCLUSIÓN DEL DIAGNÓSTICO: no es un timeout, es un turno que no cierra
+
+Con el estado durable borrado y los timeouts a 300 s, el run sigue fallando con
+`runnerd did not report its provider identity`. Rastreado hasta el final:
+
+- El TS espera `threadId` **y** (`providerExecutionKind === "remote_service"` o
+  un PID). AgentCore es remoto, así que no hay PID: depende enteramente de que
+  llegue la identidad.
+- El provider Rust **sí** emite `ProviderRuntimeIdentity::RemoteService`
+  (`aws_agentcore_provider.rs:1450`), pero sólo **después** de una respuesta del
+  harness.
+- Y el harness, sin que se satisfaga su contrato de completación, termina en
+  `max_iterations_exceeded` — exactamente lo que devolvía la invocación manual,
+  con y sin una función `finish` improvisada.
+
+**Por tanto el hilo correcto NO es subir timeouts** (aunque el arreglo de los
+30 s fijos era necesario y se queda), sino el contrato `finish`/`block`: qué
+herramientas envía el runner al harness y por qué el modelo no cierra el turno.
+Mirar juntos `maxIterations` del perfil (8), las semantic tools que arma el
+runner, y el system prompt del harness, que exige "use its finish or block
+function".
+
+Ese es trabajo de una sesión con supervisión, no de iteraciones a ciegas: cada
+ciclo son 5-10 minutos y el runner no expone lo que ocurre entre el arranque del
+provider y la identidad. — probablemente sigue esperando la
 primera respuesta del harness, que sin el contrato `finish`/`block` termina en
 `max_iterations_exceeded` (lo mismo que devolvía la invocación manual). Conviene
 mirar juntos el `maxIterations` del perfil (hoy 8) y ese contrato, porque puede
