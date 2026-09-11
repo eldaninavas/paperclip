@@ -827,6 +827,37 @@ function discoveryToolSpecs(): Record<string, unknown>[] {
   }));
 }
 
+/**
+ * Prompt tokens for one usage report, cache writes included.
+ *
+ * runner-core reports cache writes outside `inputTokens`, as `cacheWriteTokens`
+ * summed from the provider's ephemeral_1h/5m buckets. They are billed prompt
+ * tokens, so leaving them out of the total means a session's cache-building
+ * spend never reaches the ledger: on Bedrock those are tokens the Foundation
+ * account pays Amazon for and no tenant is invoiced for.
+ *
+ * Folded into input rather than carried separately, matching what the local
+ * Claude adapter does with cacheCreationInputTokens. Bedrock prices a cache
+ * write a little above input ($3.75 against $3 per million on Sonnet 4.6), so
+ * this still bills roughly 20% under on those tokens, against 100% under
+ * before. `resolveBedrockCostUsd` already accepts a `cacheWriteInputTokens`
+ * argument for the exact fix; that one needs a column on cost_events to keep
+ * the stored row recomputable.
+ */
+export function measuredInputTokens(source: Record<string, unknown>): number {
+  const integer = (...names: string[]): number => {
+    for (const name of names) {
+      const value = source[name];
+      if (Number.isSafeInteger(value) && Number(value) >= 0) return Number(value);
+    }
+    return 0;
+  };
+  return (
+    integer("inputTokens", "input_tokens")
+    + integer("cacheWriteTokens", "cacheWriteInputTokens", "cache_write_input_tokens")
+  );
+}
+
 function userInput(message: string): Record<string, unknown> {
   return { type: "text", text: message, text_elements: [] };
 }
@@ -1738,7 +1769,7 @@ export class CapabilityLiveSession {
     };
     const cumulative = {
       providerRequests: 1,
-      inputTokens: integer("inputTokens", "input_tokens"),
+      inputTokens: measuredInputTokens(total),
       outputTokens: integer("outputTokens", "output_tokens"),
       cachedInputTokens: integer("cachedInputTokens", "cached_input_tokens"),
       reasoningTokens: integer("reasoningOutputTokens", "reasoningTokens", "reasoning_output_tokens"),
@@ -2656,7 +2687,7 @@ export class CapabilityLiveSession {
         };
         const measurement = (source: Record<string, unknown>): CapabilityLiveUsageMeasurement => ({
           providerRequests: integer(source, "requests", "providerRequests"),
-          inputTokens: integer(source, "inputTokens", "input_tokens"),
+          inputTokens: measuredInputTokens(source),
           outputTokens: integer(source, "outputTokens", "output_tokens"),
           cachedInputTokens: integer(
             source,
