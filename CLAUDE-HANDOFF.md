@@ -479,6 +479,13 @@ equivocada da exactamente este fallo opaco.
 Aunque apliques la política de Bedrock, yo no puedo cerrar el ciclo solo. Dos
 barreras, ambas deliberadas y ambas tuyas:
 
+0. **Cloudflare Access (verificado, no supuesto):** ambos dominios devuelven
+   `HTTP 302` a la pantalla de login de Cloudflare —
+   `foundation.davaria.app/api/health` y `foundation-dev.davaria.app/api/health`.
+   Sin un service token de Cloudflare no puedo llamar a la API de ninguna de las
+   dos instancias desplegadas, ni siquiera a producción, que sí está corriendo.
+   Por eso todas las pruebas funcionales de esta sesión fueron contra un servidor
+   local: no fue una elección, fue la única superficie alcanzable.
 1. **ECS:** `foundation-dev` queda en `desired-count 0` al final de cada deploy,
    y mi usuario tiene `explicitDeny` sobre `ecs:UpdateService`, `DescribeServices`
    y `RunTask` — el Deny que protege producción. No puedo levantar el servicio
