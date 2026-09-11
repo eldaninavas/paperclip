@@ -399,27 +399,28 @@ configurado (`global.anthropic.claude-sonnet-4-6`) sí tiene tarifa en el ledger
 y que `RUN_LOG_S3_BUCKET` llegó hasta dentro.
 
 **Y la pieza que faltaba, ya desplegada y verde** (`foundation-dev`, commit
-`ae1ab79e6`):
+`e0176f606`):
 
 ```json
-"runLogMirror": { "reachable": true, "consecutiveFailures": 0 }
+"runLogMirror": { "reachable": true, "writable": true, "consecutiveFailures": 0 }
 ```
 
-`reachable: true` significa que **el contenedor en ECS hizo un `HeadObject`
-contra `s3://paperclip-agentcore-foundation-runlogs-dev/run-logs/…` y recibió un
-404**. Eso ejercita la cadena entera desde dentro de la task:
+Eso significa que **el contenedor en ECS, por sí mismo**, contra
+`s3://paperclip-agentcore-foundation-runlogs-dev/run-logs/…`:
 
-- las credenciales del rol de la task resuelven
-  (`AWS_CONTAINER_CREDENTIALS_RELATIVE_URI`),
-- hay ruta de red a S3 en `mx-central-1`,
-- y la bucket policy concede al rol.
+1. hizo un `HeadObject` y recibió un 404 → credenciales del rol de la task
+   resueltas (`AWS_CONTAINER_CREDENTIALS_RELATIVE_URI`), ruta de red a S3 en
+   `mx-central-1`, y grant de lectura;
+2. hizo un **`PutObject`** → **el grant de escritura funciona**, que es la
+   afirmación de producto: el output de un tenant puede salir de la task;
+3. hizo un `DeleteObject` y no dejó nada:
+   `list-objects-v2 --prefix run-logs/.foundation` → `None`.
 
-Es lo más cerca de *"los outputs de los tenants llegan a S3 desde ECS"* que se
-puede llegar sin cuota de Bedrock. Lo único que queda sin ejercitar es el
-`PutObject` en sí, y esa acción está en la misma policy sobre el mismo prefijo
-(simulada como `allowed` en el paso 1a).
+Ninguna otra comprobación de este repo toca esa cadena desde dentro del
+contenedor; todas la simulan desde fuera. Lo único que queda es que un agente
+real produzca output, y eso necesita cuota de Bedrock.
 
-`scripts/verify-foundation-cloud.sh` lo asserta: **8 OK, 0 fallas**.
+`scripts/verify-foundation-cloud.sh` lo asserta: **10 OK, 0 fallas**.
 
 #### Qué significa "harness por tenant_id", en concreto
 
