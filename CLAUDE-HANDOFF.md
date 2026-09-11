@@ -251,7 +251,51 @@ Costo ~$1/mes (KMS). `aws-agentcore.sh destroy` lo apaga.
 - `Dockerfile` — asserta el binario en la ruta exacta que usa el runtime.
 - `foundation-deploy.yml` — inyecta la configuración de Foundation Cloud en dev y prod; filtro jq validado localmente.
 - Variables de GitHub creadas en el entorno `development`: `RUN_LOG_S3_BUCKET`, `FOUNDATION_BEDROCK_MODEL`.
-- Rama `foundation-cloud-bedrock` (commit `f6ddeb2ed`), desplegada a dev por `workflow_dispatch`. **Master sin tocar.**
+- Rama `foundation-cloud-bedrock`, desplegada a dev por `workflow_dispatch`. **Master sin tocar.**
+
+#### Añadido en la sesión nocturna del 2026-09-11
+
+- `server/src/__tests__/foundation-cloud-ledger.test.ts` — **la promesa de cobro,
+  probada contra Postgres real**, no sólo contra el pricer. Un run de Sonnet 4.6
+  deja 49 centavos a nombre del tenant; dos tenants mantienen cuentas separadas;
+  un modelo sin tarifa queda `unpriced` en vez de gratis; un run con la llave del
+  cliente o con suscripción no se toca. Desactivar el pricer rompe 2 de los 5.
+  **5/5**, y 31/31 en todo el conjunto de Foundation Cloud.
+- `run-log-store.ts` + `heartbeat.readLog` — **la clave de S3 se verifica contra
+  el tenant que la pide.** El endpoint ya autorizaba al llamante para la empresa
+  del run, pero luego leía la clave que dijera la fila sin mirarla: un `log_ref`
+  mal escrito bastaba para servir a un tenant la transcripción de otro. Se
+  responde "no encontrado", no "prohibido", para que la diferencia no delate la
+  existencia del log ajeno. **5/5 tests.**
+- `runnerd-codex-transport.ts` — los dos timeouts ahora dicen qué observaron
+  (presupuesto agotado, si llegó a abrirse un hilo de provider, el servicio, y
+  los últimos diagnósticos del otro lado). El mensaje viejo, `runnerd did not
+  report its provider identity`, mandaba a buscar un bug de runnerd que no
+  existía cuando la causa real era Bedrock estrangulando detrás del harness.
+- `foundation-dev-ecs-task` ya tiene política de identidad
+  `FoundationCloudBedrockInvoke` (invoke sobre modelos Anthropic y perfiles de
+  inferencia de esta cuenta, nada más). Era la única falla de la verificación
+  que dependía de nosotros. **`scripts/verify-foundation-cloud.sh foundation dev`
+  pasa todo salvo el paso de la instancia, que necesita el service token de
+  Cloudflare.**
+- Formulario de caso de uso de Bedrock enviado en `mx-central-1` y `us-east-2`
+  (faltaba; ya estaba en `us-east-1` y `us-west-2`).
+- Rol `paperclip-agentcore-operator` (asumible sólo por `foundation-cli`, perfil
+  local `foundation-ops`): Service Quotas, formulario de acceso a modelos, y
+  `iam:PutRolePolicy` **únicamente** sobre `foundation-dev-ecs-task` y
+  `foundation-prod-ecs-task`. Deny explícito sobre ECS/RDS/ELB/EC2, creación de
+  usuarios y llaves. No es admin y no debe convertirse en admin.
+
+**Falta en prod:** la misma política `FoundationCloudBedrockInvoke` sobre
+`foundation-prod-ecs-task`. Es aditiva y no toca el servicio en marcha, pero es
+un cambio en producción y queda a tu autorización:
+
+```
+aws --profile foundation-ops iam put-role-policy \
+  --role-name foundation-prod-ecs-task \
+  --policy-name FoundationCloudBedrockInvoke \
+  --policy-document file://<el mismo documento que dev>
+```
 
 ### BLOQUEO #1 (el que manda): Bedrock tiene cuota CERO en esta cuenta
 
