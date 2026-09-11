@@ -393,7 +393,41 @@ podía casar inline functions —eso es un defecto real y el arreglo se queda—
 no era la única causa. Queda algo más entre el `toolUse` del modelo y el
 `toolResult` que debe devolver el runner.
 
-### El síntoma final: el harness nunca emite contenido
+### ✅ PRUEBA DE CONTROL: el fallo es del servicio, no de Foundation
+
+Creé un harness **mínimo** desde cero — dos parámetros (`harnessName`,
+`executionRoleArn`) más el modelo — **sin nada nuestro**: sin system prompt de
+Paperclip, sin `tools`, sin `allowedTools`, sin skills, con su propia memory y su
+endpoint `DEFAULT`. Le mandé `"Di OK."`:
+
+```
+[17.9s] {"messageStop": {"stopReason": "max_iterations_exceeded"}}
+TOTAL EVENTOS: 1
+```
+
+**Idéntico a nuestro harness.** Queda descartado, con evidencia, todo lo nuestro:
+configuración, system prompt, `allowedTools`, contrato de completación, endpoint,
+tools, memory y perfil.
+
+Un detalle que refuerza el caso: cuando al harness de control **le faltaba** un
+permiso de memoria, devolvió un `AccessDeniedException` **explícito y claro**. Es
+decir, el servicio sí sabe reportar errores; el `max_iterations_exceeded` mudo no
+es un error oculto de permisos, es el harness iterando sin producir salida.
+
+**Repro para AWS Support (no menciona Paperclip):**
+
+1. `create_harness(harnessName=..., executionRoleArn=..., model={"bedrockModelConfig":{"modelId":"global.anthropic.claude-sonnet-4-6"}})`
+2. Esperar `READY`.
+3. `invoke_harness(harnessArn=..., runtimeSessionId=..., messages=[{"role":"user","content":[{"text":"Di OK."}]}], maxIterations=2)`
+4. Resultado: un único evento `messageStop / max_iterations_exceeded`, sin
+   `messageStart`, sin deltas, sin usage — mientras `model_call_count` sube en
+   Memory.
+
+Cuenta `523859314550`, región `us-east-1`.
+
+*(El harness de control y su política temporal fueron eliminados tras la prueba.)*
+
+### El síntoma, en nuestro harness: nunca emite contenido
 
 Inspeccioné el stream completo de `InvokeHarness` sin filtros, contra el harness
 **v2** ya corregido:
