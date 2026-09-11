@@ -45,10 +45,86 @@ causas ajenas a nuestro código**:
 | Vía | Estado | Causa | Quién lo desbloquea |
 |---|---|---|---|
 | `claude_local` + Bedrock directo | ❌ | Cuota de inferencia on-demand **en 0**, y la cuota diaria (`L-248E47B7`) **no es ajustable** por autoservicio | AWS Support |
-| `paperclip_runner` + AgentCore | ❌ | El Harness no emite ningún evento de contenido, ni siquiera en un harness mínimo de control | AWS Support |
+| `paperclip_runner` + AgentCore | ❌ | Misma causa: el Harness llama a Bedrock, Bedrock estrangula cada llamada, y el Harness devuelve `max_iterations_exceeded` sin contenido | AWS Support |
 
 Ambas conclusiones están demostradas con pruebas reproducibles (ver abajo), no
 inferidas. **Todo lo que dependía de nosotros está corregido y verificado.**
+
+### Causa raíz única (verificada 2026-09-11, sesión nocturna)
+
+Los dos "bloqueos separados" son **el mismo**. El Harness de AgentCore no falla:
+invoca el modelo, Bedrock responde `ThrottlingException` a cada intento,
+`model_call_count` sube en Memory, se agotan las iteraciones y el Harness cierra
+con `messageStop / max_iterations_exceeded` **sin contenido**. Eso explica por
+qué un harness mínimo de control se comportaba igual que el nuestro.
+
+Y el estrangulamiento **no es de Anthropic: es de toda la cuenta**. Cada modelo
+on-demand probado devuelve `Too many tokens per day`, de todos los proveedores:
+
+```
+openai.gpt-oss-120b-1:0                ThrottlingException: Too many tokens per day
+qwen.qwen3-coder-next                  ThrottlingException: Too many tokens per day
+amazon.nova-pro-v1:0                   ThrottlingException: Too many tokens per day
+deepseek.v3.2                          ThrottlingException: Too many tokens per day
+mistral.mistral-large-3-675b-instruct  ThrottlingException: Too many tokens per day
+global.anthropic.claude-sonnet-4-6     ThrottlingException: Too many tokens per day
+```
+
+La prueba decisiva es comparar la cuota aplicada contra el valor por defecto de
+AWS para la misma cuota:
+
+```
+L-248E47B7  Sonnet 4.6 tokens/día   default AWS = 8 640 000 000   esta cuenta = 0   ajustable: NO
+L-9A11C666  Haiku 4.5 tokens/min    default AWS =     5 000 000   esta cuenta = 0   ajustable: sí
+L-7BEE40FB  Sonnet 4.6 tokens/min   default AWS =     6 000 000   esta cuenta = 0   ajustable: sí
+```
+
+No es que la cuenta no haya pedido cuota: **AWS puso la cuenta en cero por
+encima de su propio valor por defecto.** Eso es un estado de cuenta, no una
+configuración nuestra, y no hay forma de arreglarlo desde el código.
+
+### Lo que ya se intentó por autoservicio, y por qué no alcanza
+
+1. **Formulario de caso de uso** (`bedrock:PutUseCaseForModelAccess`, el mismo
+   que la consola llama *Model access → Modify model access → Submit use case
+   details*). Ya estaba enviado en `us-east-1` y `us-west-2`, y el
+   estrangulamiento siguió igual. Esta sesión lo envió también en
+   `mx-central-1` (la región del cluster) y `us-east-2`, donde faltaba. Si el
+   formulario fuera la única puerta, esto la abre; no parece serlo.
+2. **Aumento de cuota por autoservicio**: rechazado por la propia API —
+   `You must provide a quota value greater than the default quota value of
+   6000000.0`. Es decir, Service Quotas considera que la cuenta *ya debería*
+   tener 6M TPM. No se puede "pedir" volver al valor por defecto.
+3. **Caso de soporte por API**: imposible. La cuenta está en soporte **Basic**
+   (`SubscriptionRequiredException` en `support:DescribeSeverityLevels`), así
+   que el caso debe abrirse **desde la consola**, categoría *Account and
+   Billing* (esa sí está disponible en Basic).
+
+### Texto del caso para AWS (listo para pegar)
+
+> **Asunto:** Bedrock on-demand inference quotas are set to 0 account-wide
+>
+> Account `523859314550`, standalone, no Organization. Every Bedrock on-demand
+> model returns `ThrottlingException: Too many tokens per day` on the first
+> request of the day, across all providers (Anthropic, OpenAI, Amazon Nova,
+> Qwen, DeepSeek, Mistral) and all regions tested (`us-east-1`, `us-west-2`,
+> `mx-central-1`).
+>
+> `GetServiceQuota` reports the applied value as 0 for quotas whose AWS default
+> is not 0. Example: `L-248E47B7` (Global cross-region tokens per day for Claude
+> Sonnet 4.6) has an AWS default of 8,640,000,000 and an applied value of 0, and
+> is not adjustable. `L-7BEE40FB` (tokens per minute, same model) has a default
+> of 6,000,000 and an applied value of 0.
+>
+> A self-service increase is refused because the requested value must exceed the
+> default, which the account does not currently have. Model access shows
+> "Access granted" and the use case form has been submitted in us-east-1,
+> us-west-2, us-east-2 and mx-central-1.
+>
+> Please restore the default on-demand inference quotas for this account.
+
+**Cómo abrirlo:** consola AWS → Support → Create case → *Account and Billing* →
+Service: *Billing* o *Account* → pegar el texto anterior.
 
 **Implicación de producto:** Foundation Cloud no puede venderse hasta que AWS
 habilite al menos una de las dos vías. Conviene abrir el caso de soporte antes de
