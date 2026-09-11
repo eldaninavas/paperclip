@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  normalizeBilledCostCents,
   resolveCacheAdjustedCostUsd,
   resolveLedgerCostStatus,
 } from "../services/heartbeat.js";
+import { resolveBedrockCostUsd } from "../services/bedrock-pricing.js";
 
 describe("heartbeat cost accounting", () => {
   it("marks token-bearing CLI usage without a reported cost as unpriced", () => {
@@ -63,5 +65,44 @@ describe("heartbeat cost accounting", () => {
       costUsd: 3.1,
       cacheAdjustedCostUsd: 1.5,
     })).toBe(1.5);
+  });
+});
+
+/**
+ * The Foundation Cloud billing path, end to end over the pure helpers.
+ *
+ * A managed run reaches the ledger with token counts and no cost, because
+ * Claude Code cannot price Bedrock. These assertions pin the two steps that
+ * turn that into a billable row, since either one silently yields a zero-cent
+ * charge for a tenant that did consume tokens.
+ */
+describe("Foundation Cloud (Bedrock) ledger pricing", () => {
+  const usage = { inputTokens: 48_000, cachedInputTokens: 120_000, outputTokens: 6_500 };
+
+  it("prices a Bedrock run the adapter reported no cost for", () => {
+    const adapterCost = resolveCacheAdjustedCostUsd({ costUsd: null });
+    expect(adapterCost ?? null).toBeNull();
+
+    const priced = resolveBedrockCostUsd("us.anthropic.claude-sonnet-4-6", usage);
+    expect(priced).not.toBeNull();
+    expect(priced!).toBeGreaterThan(0);
+  });
+
+  /**
+   * `metered_api` is what claude-local reports once CLAUDE_CODE_USE_BEDROCK is
+   * set. It must not be zeroed the way `subscription_included` is — that branch
+   * exists for runs already paid for by a seat, and a Bedrock run is not one.
+   */
+  it("keeps the priced amount because a Bedrock run is metered, not included in a subscription", () => {
+    const priced = resolveBedrockCostUsd("us.anthropic.claude-sonnet-4-6", usage)!;
+    expect(normalizeBilledCostCents(priced, "metered_api")).toBeGreaterThan(0);
+    expect(normalizeBilledCostCents(priced, "subscription_included")).toBe(0);
+  });
+
+  it("reports the run as priced once Bedrock supplies the cost", () => {
+    const priced = resolveBedrockCostUsd("us.anthropic.claude-sonnet-4-6", usage)!;
+    expect(resolveLedgerCostStatus({ costUsd: priced, ...usage })).toBe("reported");
+    // Without the pricer the same run is recorded as owed-but-unbilled.
+    expect(resolveLedgerCostStatus({ costUsd: null, ...usage })).toBe("unpriced");
   });
 });

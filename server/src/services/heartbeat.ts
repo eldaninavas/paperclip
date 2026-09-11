@@ -4707,7 +4707,10 @@ function resolveLedgerBiller(result: AdapterExecutionResult): string {
   );
 }
 
-function normalizeBilledCostCents(
+// Exported alongside the other ledger helpers so the Foundation Cloud pricing
+// path can be asserted without standing up a run: this is the step that decides
+// whether a priced Bedrock run reaches cost_events as cents or as zero.
+export function normalizeBilledCostCents(
   costUsd: number | null | undefined,
   billingType: BillingType,
 ): number {
