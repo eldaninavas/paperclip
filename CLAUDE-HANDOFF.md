@@ -350,11 +350,32 @@ arreglo, Foundation Cloud habría fallado igual y con el mismo mensaje opaco.
 Corregido: la allowlist ahora incluye las variables de credenciales de
 contenedor, de web identity, estáticas y de perfil.
 
-**Queda un segundo factor en local:** tras el arreglo, el run local sigue dando
-`CredentialsNotLoaded`. El arreglo es correcto y necesario (el bug de ECS es
-real), pero en esta máquina algo más impide que las credenciales lleguen al
-proceso — probablemente el runner se lanza por una ruta que no pasa por
-`buildNativeProviderEnvironment`. Ése es el siguiente hilo del que tirar.
+**Diagnóstico cerrado (y una corrección a mi primera lectura).** Hay *dos*
+filtros en serie:
+
+1. `NATIVE_PROVIDER_HOST_ENV_KEYS` (servidor) — lo que el servidor entrega al
+   runner. **Aquí faltaba todo lo de AWS. Éste era el bug.**
+2. `runnerExplicitProviderEnvironmentKeys` (control plane) — lo que cruza hasta
+   el proceso. Esta lista **ya permitía** `AWS_CONTAINER_CREDENTIALS_RELATIVE_URI`,
+   `AWS_ROLE_ARN`, `AWS_WEB_IDENTITY_TOKEN_FILE`… pero **excluye a propósito**
+   `AWS_ACCESS_KEY_ID` y `AWS_SECRET_ACCESS_KEY`: credenciales de larga vida no
+   deben cruzar ese límite.
+
+Es decir: el diseño contempla ECS correctamente (task role vía endpoint de
+contenedor) y rechaza claves estáticas. El servidor simplemente nunca pasaba la
+variable que ECS inyecta. Corregido, y alineado con la lista de abajo para no
+listar claves que el control plane volvería a filtrar.
+
+**Implicación para las pruebas: esta ruta NO se puede verificar en local con
+claves estáticas — es por diseño.** Hay que probarla en ECS, donde la task role
+provee la identidad. Por eso el run local seguía fallando después del arreglo:
+no es un fallo, es la frontera funcionando.
+
+**Con esto, la secuencia para cerrar el end-to-end es:**
+1. Aplicar la política de Bedrock a `foundation-dev-ecs-task` (sección BLOQUEO #2).
+2. El deploy con este arreglo ya está lanzado a dev.
+3. Escalar `foundation-dev` a 1 y ejecutar un agente `paperclip_runner`/`aws_agentcore`.
+4. Verificar `cost_events` (centavos > 0) y los objetos en S3.
 
 **Antiguo siguiente paso (ya hecho):** instrumentar
 `aws_agentcore_provider.rs` para emitir el error sin redactar en modo
