@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   normalizeBilledCostCents,
+  resolveBilledCostUsd,
   resolveCacheAdjustedCostUsd,
   resolveLedgerCostStatus,
 } from "../services/heartbeat.js";
@@ -104,5 +105,48 @@ describe("Foundation Cloud (Bedrock) ledger pricing", () => {
     expect(resolveLedgerCostStatus({ costUsd: priced, ...usage })).toBe("reported");
     // Without the pricer the same run is recorded as owed-but-unbilled.
     expect(resolveLedgerCostStatus({ costUsd: null, ...usage })).toBe("unpriced");
+  });
+});
+
+describe("one billed-cost answer for the ledger and the run", () => {
+  const bedrockUsage = {
+    inputTokens: 120_000,
+    cachedInputTokens: 40_000,
+    outputTokens: 8_000,
+  };
+
+  it("prices a Bedrock run the adapter left uncosted", () => {
+    // Claude Code reports tokens and no cost under CLAUDE_CODE_USE_BEDROCK.
+    // Both the ledger row and the run's own usageJson read this, and they
+    // disagreed before it existed: cost_events said reported with cents while
+    // the run described itself as unpriced.
+    const usd = resolveBilledCostUsd(
+      { model: "global.anthropic.claude-sonnet-4-6" } as never,
+      bedrockUsage,
+    );
+    expect(usd).toBeCloseTo(0.492, 6);
+    expect(
+      resolveLedgerCostStatus({ costUsd: usd, ...bedrockUsage }),
+    ).toBe("reported");
+  });
+
+  it("leaves an adapter-reported price alone", () => {
+    expect(
+      resolveBilledCostUsd(
+        { model: "global.anthropic.claude-sonnet-4-6", costUsd: 1.25 } as never,
+        bedrockUsage,
+      ),
+    ).toBeCloseTo(1.25, 6);
+  });
+
+  it("refuses to guess a price for a model it has no rate for", () => {
+    const usd = resolveBilledCostUsd(
+      { model: "global.anthropic.claude-nonesuch-9-9" } as never,
+      bedrockUsage,
+    );
+    expect(usd).toBeNull();
+    expect(
+      resolveLedgerCostStatus({ costUsd: usd, ...bedrockUsage }),
+    ).toBe("unpriced");
   });
 });

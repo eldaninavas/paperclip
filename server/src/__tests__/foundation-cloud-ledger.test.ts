@@ -16,11 +16,10 @@ import { costService } from "../services/costs.ts";
 import {
   normalizeBilledCostCents,
   normalizeLedgerBillingType,
-  resolveCacheAdjustedCostUsd,
+  resolveBilledCostUsd,
   resolveLedgerBiller,
   resolveLedgerCostStatus,
 } from "../services/heartbeat.ts";
-import { resolveBedrockCostUsd } from "../services/bedrock-pricing.ts";
 import {
   getEmbeddedPostgresTestSupport,
   startEmbeddedPostgresTestDatabase,
@@ -49,15 +48,10 @@ function ledgerRowFor(result: {
 }) {
   const { inputTokens, cachedInputTokens, outputTokens } = result.usage;
   const billingType = normalizeLedgerBillingType(result.billingType);
-  const billedCostUsd =
-    resolveCacheAdjustedCostUsd(
-      result as Parameters<typeof resolveCacheAdjustedCostUsd>[0],
-    ) ??
-    resolveBedrockCostUsd(result.model, {
-      inputTokens,
-      cachedInputTokens,
-      outputTokens,
-    });
+  const billedCostUsd = resolveBilledCostUsd(
+    result as Parameters<typeof resolveBilledCostUsd>[0],
+    { inputTokens, cachedInputTokens, outputTokens },
+  );
   return {
     provider: result.provider ?? "unknown",
     biller: resolveLedgerBiller(

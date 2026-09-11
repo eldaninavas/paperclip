@@ -4711,6 +4711,35 @@ export function resolveLedgerBiller(result: AdapterExecutionResult): string {
   );
 }
 
+/**
+ * What a run cost, in USD, from whichever source can answer.
+ *
+ * The adapter's own price wins, so a customer-supplied Anthropic key still
+ * bills at the price Anthropic reported. Only when the adapter has none -- which
+ * is every run under CLAUDE_CODE_USE_BEDROCK, because Claude Code cannot know
+ * Foundation's AWS rates -- does the Bedrock rate card answer. An unrecognized
+ * Bedrock model returns null and stays `unpriced` rather than being billed at a
+ * guess.
+ *
+ * One function because two callers need the same answer: the ledger row and the
+ * run's own usageJson. They disagreed before this existed -- cost_events said
+ * `reported` with cents while the run described itself as `unpriced` -- and a
+ * run recorded two ways is a support ticket nobody can close.
+ */
+export function resolveBilledCostUsd(
+  result: AdapterExecutionResult,
+  usage: {
+    inputTokens: number;
+    cachedInputTokens: number;
+    outputTokens: number;
+  },
+): number | null {
+  return (
+    resolveCacheAdjustedCostUsd(result) ??
+    resolveBedrockCostUsd(result.model, usage)
+  );
+}
+
 // Exported alongside the other ledger helpers so the Foundation Cloud pricing
 // path can be asserted without standing up a run: this is the step that decides
 // whether a priced Bedrock run reaches cost_events as cents or as zero.
@@ -17197,13 +17226,11 @@ export function heartbeatService(
     // The adapter keeps precedence, so a customer-supplied Anthropic key still
     // bills at the price Anthropic reported, and an unrecognized Bedrock model
     // stays `unpriced` instead of being billed at a guessed rate.
-    const billedCostUsd =
-      resolveCacheAdjustedCostUsd(result) ??
-      resolveBedrockCostUsd(result.model, {
-        inputTokens,
-        cachedInputTokens,
-        outputTokens,
-      });
+    const billedCostUsd = resolveBilledCostUsd(result, {
+      inputTokens,
+      cachedInputTokens,
+      outputTokens,
+    });
     const additionalCostCents = normalizeBilledCostCents(
       billedCostUsd,
       billingType,
@@ -21245,7 +21272,14 @@ export function heartbeatService(
                 ? "timed_out"
                 : "failed";
 
-        const cacheAdjustedCostUsd = resolveCacheAdjustedCostUsd(adapterResult);
+        // Same answer the ledger will record. Reading only the adapter here
+        // left every Foundation Cloud run describing itself as `unpriced` while
+        // its cost_events row carried real cents.
+        const cacheAdjustedCostUsd = resolveBilledCostUsd(adapterResult, {
+          inputTokens: normalizedUsage?.inputTokens ?? 0,
+          cachedInputTokens: normalizedUsage?.cachedInputTokens ?? 0,
+          outputTokens: normalizedUsage?.outputTokens ?? 0,
+        });
         const usageJson =
           normalizedUsage ||
           adapterResult.costUsd != null ||
