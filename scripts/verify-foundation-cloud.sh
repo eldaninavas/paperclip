@@ -26,21 +26,43 @@ A() { aws --profile "$PROFILE" --no-cli-pager "$@" 2>&1; }
 echo "Foundation Cloud — verificación (${ENVIRONMENT}, ${REGION})"
 echo
 
-echo "1. Credenciales de la task para Bedrock y S3"
+echo "1a. Escritura de run logs en S3 (via bucket policy, no requiere IAM)"
+# The bucket policy grants the task roles directly, so this works even with an
+# empty identity policy — a resource-based grant is sufficient within one
+# account. Simulated against the live bucket policy rather than assumed.
+policy_file="$(mktemp)"
+if A --region "$REGION" s3api get-bucket-policy --bucket "$BUCKET" --query Policy --output text > "$policy_file" 2>/dev/null \
+   && [[ -s "$policy_file" ]]; then
+  decision="$(A iam simulate-principal-policy \
+    --policy-source-arn "arn:aws:iam::523859314550:role/${TASK_ROLE}" \
+    --action-names s3:PutObject \
+    --resource-arns "arn:aws:s3:::${BUCKET}/run-logs/c/a/r.ndjson" \
+    --resource-policy "file://${policy_file}" \
+    --resource-owner arn:aws:iam::523859314550:root \
+    --query 'EvaluationResults[0].EvalDecision' --output text)"
+  [[ "$decision" == "allowed" ]] \
+    && ok "$TASK_ROLE puede escribir run logs (s3:PutObject → allowed)" \
+    || bad "s3:PutObject → $decision pese a la bucket policy"
+else
+  bad "el bucket $BUCKET no tiene bucket policy: la task no podrá escribir run logs"
+fi
+rm -f "$policy_file"
+echo
+
+echo "1b. Acceso a Bedrock (requiere política de identidad; Bedrock no admite policy de recurso)"
 policies="$(A iam list-role-policies --role-name "$TASK_ROLE" --query 'PolicyNames' --output text)"
 attached="$(A iam list-attached-role-policies --role-name "$TASK_ROLE" --query 'AttachedPolicies[].PolicyName' --output text)"
 if [[ -z "${policies// }" && -z "${attached// }" ]]; then
-  bad "$TASK_ROLE no tiene ninguna política: el contenedor no puede invocar Bedrock ni escribir en S3."
-  note "Aplica la política de CLAUDE-HANDOFF.md (sección BLOQUEADO) antes de seguir."
+  bad "$TASK_ROLE no tiene política de identidad: el contenedor no puede invocar Bedrock."
+  note "Es el único paso que falta. Ver CLAUDE-HANDOFF.md, sección BLOQUEADO."
 else
-  ok "$TASK_ROLE tiene políticas: ${policies} ${attached}"
-  for action in bedrock:InvokeModelWithResponseStream s3:PutObject; do
-    decision="$(A iam simulate-principal-policy \
-      --policy-source-arn "arn:aws:iam::523859314550:role/${TASK_ROLE}" \
-      --action-names "$action" --resource-arns "*" \
-      --query 'EvaluationResults[0].EvalDecision' --output text)"
-    [[ "$decision" == "allowed" ]] && ok "$action → allowed" || bad "$action → $decision"
-  done
+  decision="$(A iam simulate-principal-policy \
+    --policy-source-arn "arn:aws:iam::523859314550:role/${TASK_ROLE}" \
+    --action-names bedrock:InvokeModelWithResponseStream --resource-arns "*" \
+    --query 'EvaluationResults[0].EvalDecision' --output text)"
+  [[ "$decision" == "allowed" ]] \
+    && ok "bedrock:InvokeModelWithResponseStream → allowed" \
+    || bad "bedrock:InvokeModelWithResponseStream → $decision"
 fi
 echo
 

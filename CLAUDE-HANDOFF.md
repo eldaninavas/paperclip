@@ -99,60 +99,63 @@ Costo ~$1/mes (KMS). `aws-agentcore.sh destroy` lo apaga.
 - Variables de GitHub creadas en el entorno `development`: `RUN_LOG_S3_BUCKET`, `FOUNDATION_BEDROCK_MODEL`.
 - Rama `foundation-cloud-bedrock` (commit `f6ddeb2ed`), desplegada a dev por `workflow_dispatch`. **Master sin tocar.**
 
-### BLOQUEADO — requiere al fundador
+### BLOQUEADO — un solo comando, requiere al fundador
 
-El rol **`foundation-dev-ecs-task` no tiene ninguna política**. Sin ella el contenedor no puede invocar Bedrock ni escribir en S3, así que la cadena no funcionará en runtime aunque el deploy pase.
+**S3 ya está resuelto**: los buckets llevan una *bucket policy* que concede
+directamente a `foundation-dev-ecs-task` y `foundation-prod-ecs-task`. Dentro de
+una misma cuenta una concesión basada en recurso es suficiente, así que los run
+logs funcionan sin política de identidad. Verificado con
+`simulate-principal-policy` contra la policy viva: `s3:PutObject → allowed`.
 
-El usuario `foundation-cli` no puede concedérsela: su política limita IAM a `role/paperclip-agentcore-*` (verificado con `simulate-principal-policy` → `implicitDeny`). El rol del pipeline tampoco tiene IAM.
+**Falta sólo Bedrock**, que no admite políticas basadas en recurso y exige una
+política de identidad en el rol de la task. El usuario `foundation-cli` no puede
+crearla (su IAM está limitado a `role/paperclip-agentcore-*`; verificado:
+`implicitDeny` en `PutRolePolicy`, `CreateRole`, `CreatePolicy`,
+`CreateServiceSpecificCredential`). El rol del pipeline tampoco tiene IAM.
 
 **Ejecutar en CloudShell:**
 
 ```bash
-cat > /tmp/foundation-task.json <<'JSON'
+cat > /tmp/bedrock.json <<'JSON'
 {
   "Version": "2012-10-17",
-  "Statement": [
-    { "Sid": "InvokeBedrockAnthropic", "Effect": "Allow",
-      "Action": ["bedrock:InvokeModel","bedrock:InvokeModelWithResponseStream",
-                 "bedrock:ListFoundationModels","bedrock:GetFoundationModel",
-                 "bedrock:ListInferenceProfiles","bedrock:GetInferenceProfile"],
-      "Resource": "*" },
-    { "Sid": "DurableRunLogsPerTenant", "Effect": "Allow",
-      "Action": ["s3:PutObject","s3:GetObject","s3:DeleteObject"],
-      "Resource": "arn:aws:s3:::paperclip-agentcore-foundation-runlogs-dev/run-logs/*" },
-    { "Sid": "EnumerateOwnRunLogs", "Effect": "Allow",
-      "Action": ["s3:ListBucket","s3:GetBucketLocation"],
-      "Resource": "arn:aws:s3:::paperclip-agentcore-foundation-runlogs-dev",
-      "Condition": { "StringLike": { "s3:prefix": ["run-logs/*","run-logs"] } } }
-  ]
+  "Statement": [{
+    "Sid": "InvokeBedrockAnthropic",
+    "Effect": "Allow",
+    "Action": ["bedrock:InvokeModel","bedrock:InvokeModelWithResponseStream",
+               "bedrock:ListFoundationModels","bedrock:GetFoundationModel",
+               "bedrock:ListInferenceProfiles","bedrock:GetInferenceProfile"],
+    "Resource": "*"
+  }]
 }
 JSON
 
-aws iam put-role-policy --role-name foundation-dev-ecs-task \
-  --policy-name FoundationCloudBedrockAndRunLogs \
-  --policy-document file:///tmp/foundation-task.json
-
-# Y lo mismo para produccion, con su propio bucket:
-sed 's/runlogs-dev/runlogs-prod/g' /tmp/foundation-task.json > /tmp/foundation-task-prod.json
-aws iam put-role-policy --role-name foundation-prod-ecs-task \
-  --policy-name FoundationCloudBedrockAndRunLogs \
-  --policy-document file:///tmp/foundation-task-prod.json
+for role in foundation-dev-ecs-task foundation-prod-ecs-task; do
+  aws iam put-role-policy --role-name "$role" \
+    --policy-name FoundationCloudBedrock \
+    --policy-document file:///tmp/bedrock.json
+done
 ```
 
-Después, para comprobar que quedó bien:
+Después:
 
 ```bash
 bash scripts/verify-foundation-cloud.sh foundation dev
 ```
 
-Intenté evitar esto con una **bucket policy** (concede desde el lado del recurso,
-sin tocar IAM) y el bucket ya estaba creado para ello, pero el harness de Claude
-Code bloquea conceder permisos a un principal. El JSON quedó listo en
-`scratchpad/runlogs-bucket-policy.json` por si prefieres esa vía para S3; aun así
-**Bedrock necesita sí o sí la política de identidad de arriba**, porque no admite
-políticas basadas en recurso.
+Para que yo pueda hacerlo sin ti la próxima vez, añade a
+`FoundationAgentCoreProvisioning` un statement con
+`iam:PutRolePolicy`/`GetRolePolicy`/`DeleteRolePolicy` sobre
+`arn:aws:iam::523859314550:role/foundation-*-ecs-task`. No es admin: sigue sin
+poder tocar ECS, RDS ni crear roles nuevos.
 
-Para que yo pueda hacerlo sin ti la próxima vez, añade a `FoundationAgentCoreProvisioning` un statement con `iam:PutRolePolicy`/`GetRolePolicy`/`DeleteRolePolicy` sobre `arn:aws:iam::523859314550:role/foundation-*-ecs-task`. No es admin: sigue sin poder tocar ECS, RDS ni crear roles nuevos.
+### Pendiente después de desbloquear
+
+1. Escalar `foundation-dev` a 1 (el deploy lo apaga al terminar) y ejecutar un agente.
+2. Verificar `cost_events`: `cost_cents > 0` y `cost_status = reported` con `biller = aws_bedrock`.
+3. Verificar objetos en `s3://paperclip-agentcore-foundation-runlogs-dev/run-logs/<companyId>/<agentId>/`.
+4. Elegir y contratar proveedor de sandbox (ver RIESGO ABIERTO).
+5. El onboarding sigue con Foundation Cloud **deshabilitado**; activarlo sólo cuando 2 y 3 estén verdes.
 
 ### RIESGO ABIERTO: aislamiento entre tenants en la ejecución
 
@@ -186,10 +189,4 @@ bloqueante hoy (el default manda), pero antes de exponer el selector de modelo a
 clientes hay que filtrar el catálogo por los perfiles realmente disponibles en la
 región del cluster.
 
-### Pendiente después de desbloquear
 
-1. Verificar un run real en dev: que `cost_events` tenga `costCents > 0` y `costStatus: reported`.
-2. Verificar objetos en `s3://paperclip-agentcore-foundation-runlogs-dev/run-logs/<companyId>/<agentId>/`.
-3. Elegir y contratar proveedor de sandbox (decisión de costo).
-4. Bucket y variables equivalentes para producción.
-5. El onboarding sigue con Foundation Cloud **deshabilitado**; activarlo sólo cuando 1 y 2 estén verdes.
