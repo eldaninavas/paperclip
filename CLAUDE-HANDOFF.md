@@ -630,7 +630,15 @@ provider remoto todavía no llega a anunciarse en el tiempo disponible.
 fases no son estables entre intentos: conviene verificar primero que el
 transporte PRP se establece antes de seguir mirando AgentCore.
 
-### ⚠️ CAUSA RAÍZ: el harness bloquea sus propias herramientas de completación
+### Hallazgo intermedio (real, pero NO era la causa raíz)
+
+> Se corrigió y sigue siendo correcto corregirlo, pero **no era lo que impedía
+> ejecutar**. La causa real es la cuota de Bedrock en 0; ver *Causa raíz única*
+> al principio. Se conserva porque el bug del patrón de herramientas es
+> auténtico y habría bloqueado la completación igualmente en cuanto el modelo
+> respondiera.
+
+#### El harness bloqueaba sus propias herramientas de completación
 
 `infra/aws-agentcore-paperclip.yaml:283` configura el harness con:
 
@@ -681,7 +689,15 @@ podía casar inline functions —eso es un defecto real y el arreglo se queda—
 no era la única causa. Queda algo más entre el `toolUse` del modelo y el
 `toolResult` que debe devolver el runner.
 
-### ✅ PRUEBA DE CONTROL: el fallo es del servicio, no de Foundation
+### ✅ PRUEBA DE CONTROL: el fallo no es de Foundation
+
+> Lo que esta prueba demuestra, con la evidencia de la noche encima: el harness
+> mínimo devuelve `max_iterations_exceeded` **porque Bedrock estrangula cada
+> llamada al modelo**, no porque el servicio AgentCore esté roto. El
+> `model_call_count` que sube en Memory son los intentos. Cuando al harness de
+> control le faltaba un permiso de memoria devolvía un `AccessDeniedException`
+> explícito, así que el servicio sí sabe reportar errores — el que no reporta
+> nada es el estrangulamiento detrás.
 
 Creé un harness **mínimo** desde cero — dos parámetros (`harnessName`,
 `executionRoleArn`) más el modelo — **sin nada nuestro**: sin system prompt de
