@@ -14,6 +14,7 @@ ENVIRONMENT="${2:-dev}"
 REGION="mx-central-1"
 BUCKET="paperclip-agentcore-foundation-runlogs-${ENVIRONMENT}"
 TASK_ROLE="foundation-${ENVIRONMENT}-ecs-task"
+MODEL_ID="${FOUNDATION_BEDROCK_MODEL:-global.anthropic.claude-sonnet-4-6}"
 
 pass=0
 fail=0
@@ -56,19 +57,27 @@ if [[ -z "${policies// }" && -z "${attached// }" ]]; then
   bad "$TASK_ROLE no tiene política de identidad: el contenedor no puede invocar Bedrock."
   note "Es el único paso que falta. Ver CLAUDE-HANDOFF.md, sección BLOQUEADO."
 else
-  decision="$(A iam simulate-principal-policy \
-    --policy-source-arn "arn:aws:iam::523859314550:role/${TASK_ROLE}" \
-    --action-names bedrock:InvokeModelWithResponseStream --resource-arns "*" \
-    --query 'EvaluationResults[0].EvalDecision' --output text)"
-  [[ "$decision" == "allowed" ]] \
-    && ok "bedrock:InvokeModelWithResponseStream → allowed" \
-    || bad "bedrock:InvokeModelWithResponseStream → $decision"
+  # Simulated against the ARNs a run actually names, not "*". A correctly scoped
+  # policy denies "*" by design, so testing the wildcard reports a failure that
+  # is really the test being wrong. A global inference profile needs both: the
+  # profile in this account, and the region-less foundation model it routes to.
+  profile_arn="arn:aws:bedrock:${REGION}:523859314550:inference-profile/${MODEL_ID}"
+  model_arn="arn:aws:bedrock:::foundation-model/${MODEL_ID#global.}"
+  for arn in "$profile_arn" "$model_arn"; do
+    decision="$(A iam simulate-principal-policy \
+      --policy-source-arn "arn:aws:iam::523859314550:role/${TASK_ROLE}" \
+      --action-names bedrock:InvokeModelWithResponseStream --resource-arns "$arn" \
+      --query 'EvaluationResults[0].EvalDecision' --output text)"
+    [[ "$decision" == "allowed" ]] \
+      && ok "InvokeModelWithResponseStream → allowed sobre ${arn##*/}" \
+      || bad "InvokeModelWithResponseStream → $decision sobre $arn"
+  done
 fi
 echo
 
 echo "2. Modelo habilitado en la región del cluster"
 avail="$(A --region "$REGION" bedrock get-foundation-model-availability \
-  --model-id anthropic.claude-sonnet-4-6 --query 'agreementAvailability.status' --output text)"
+  --model-id "${MODEL_ID#global.}" --query 'agreementAvailability.status' --output text)"
 [[ "$avail" == "AVAILABLE" ]] \
   && ok "acuerdo del modelo: AVAILABLE en $REGION" \
   || bad "acuerdo del modelo: $avail (habilítalo invocándolo una vez desde la consola)"
