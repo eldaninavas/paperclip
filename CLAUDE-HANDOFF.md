@@ -36,6 +36,25 @@
 - El AWS CLI local (2.28.4) **no** tiene las operaciones de AgentCore Harness. Usar el contenedor oficial:
   `docker run --rm -v "$HOME/.aws:/root/.aws:ro" -e AWS_PROFILE=foundation public.ecr.aws/aws-cli/aws-cli:latest <args>`
 
+## ⛔ RESUMEN EJECUTIVO: las dos vías a Bedrock están bloqueadas por AWS
+
+Foundation Cloud tiene exactamente dos caminos para ejecutar un modelo, y esta
+sesión verificó que **ninguno funciona hoy en la cuenta `523859314550`, por
+causas ajenas a nuestro código**:
+
+| Vía | Estado | Causa | Quién lo desbloquea |
+|---|---|---|---|
+| `claude_local` + Bedrock directo | ❌ | Cuota de inferencia on-demand **en 0**, y la cuota diaria (`L-248E47B7`) **no es ajustable** por autoservicio | AWS Support |
+| `paperclip_runner` + AgentCore | ❌ | El Harness no emite ningún evento de contenido, ni siquiera en un harness mínimo de control | AWS Support |
+
+Ambas conclusiones están demostradas con pruebas reproducibles (ver abajo), no
+inferidas. **Todo lo que dependía de nosotros está corregido y verificado.**
+
+**Implicación de producto:** Foundation Cloud no puede venderse hasta que AWS
+habilite al menos una de las dos vías. Conviene abrir el caso de soporte antes de
+seguir invirtiendo ingeniería en esta arquitectura, y considerar un plan B
+(p. ej. API de Anthropic directa con la clave del propio cliente) si AWS tarda.
+
 ## Arquitectura de Foundation Cloud — CORREGIDO de madrugada
 
 > **Lee esto antes que nada: la recomendación cambió a mitad de sesión, con
