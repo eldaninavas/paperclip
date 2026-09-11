@@ -393,10 +393,39 @@ podía casar inline functions —eso es un defecto real y el arreglo se queda—
 no era la única causa. Queda algo más entre el `toolUse` del modelo y el
 `toolResult` que debe devolver el runner.
 
-**Siguiente paso sugerido:** capturar el stream de `InvokeHarness` desde el
-runner (no desde un script externo) para ver si el modelo llega a emitir
-`toolUse` de `paperclip_finish` y qué hace el runner con él. Ahí está la pieza
-que falta.
+### El síntoma final: el harness nunca emite contenido
+
+Inspeccioné el stream completo de `InvokeHarness` sin filtros, contra el harness
+**v2** ya corregido:
+
+```
+[17.5s] evento 1: {"messageStop": {"stopReason": "max_iterations_exceeded"}}
+TOTAL EVENTOS: 1
+```
+
+**Un solo evento.** Ni `messageStart`, ni `contentBlockDelta`, ni `toolUse`, ni
+`metadata` con usage. En cambio `model_call_count` sí sube en Memory: el modelo
+se invoca de verdad y su salida no aparece en el stream.
+
+Escala con las iteraciones (~8-17 s cada una), así que el harness itera, llama al
+modelo y descarta —o nunca recibe— la respuesta.
+
+**Esto ya no parece configuración nuestra.** Las cosas bajo nuestro control están
+verificadas: el modelo está habilitado y con acuerdo `AVAILABLE`, el rol de
+ejecución tiene Bedrock y Marketplace, el contexto se sube cifrado, el endpoint
+está `READY` en v2, y `allowedTools` admite el contrato. Con todo eso, un harness
+sano debería emitir al menos `messageStart`.
+
+**Lo que yo haría a continuación, por orden de coste:**
+1. Abrir un caso con AWS Support con esta traza: *"InvokeHarness returns only
+   messageStop/max_iterations_exceeded, no content events, while Memory shows
+   model_call_count incrementing"*, citando harness
+   `PaperclipAgentCoreHarness-L0mN61eLn1` en `us-east-1`. Es reproducible en tres
+   líneas y no depende de Paperclip.
+2. En paralelo, revisar si el `Environment` del harness (el bloque
+   `AgentCoreRuntimeEnvironment` del template) necesita algo que el PoC no fija.
+3. No seguir tocando el lado de Paperclip: los seis defectos que sí eran nuestros
+   están corregidos, y este no responde a ninguno de ellos.
 
 ### Diagnóstico previo (correcto pero incompleto): parecía un timeout
 
