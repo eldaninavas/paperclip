@@ -156,7 +156,23 @@ jobs:
           TASK_ARN=$(aws ecs register-task-definition --cli-input-json file://next-task-definition.json --query taskDefinition.taskDefinitionArn --output text)
           aws ecs update-service --cluster "$CLUSTER" --service "$SERVICE" --task-definition "$TASK_ARN" --desired-count 1 --force-new-deployment
           aws ecs wait services-stable --cluster "$CLUSTER" --services "$SERVICE"
-          aws elbv2 wait target-in-service --target-group-arn "$TARGET_GROUP"
+          # `elbv2 wait target-in-service` without --targets waits for EVERY
+          # registered target, and the one this deploy just replaced sits in
+          # `draining` for the deregistration delay -- so every deploy spent
+          # about ten extra minutes waiting on a target that is never coming
+          # back. What the deploy needs to know is that a target is serving, so
+          # that is what it checks.
+          for attempt in $(seq 1 40); do
+            healthy=$(aws elbv2 describe-target-health --target-group-arn "$TARGET_GROUP" \
+              --query "length(TargetHealthDescriptions[?TargetHealth.State=='healthy'])" --output text)
+            [ "$healthy" -ge 1 ] && break
+            if [ "$attempt" -eq 40 ]; then
+              echo "No healthy target in $TARGET_GROUP after 10 minutes" >&2
+              aws elbv2 describe-target-health --target-group-arn "$TARGET_GROUP" >&2
+              exit 1
+            fi
+            sleep 15
+          done
       - name: Verify development health through Cloudflare Access
         env:
           HEALTH_URL: https://foundation-dev.davaria.app/api/health
