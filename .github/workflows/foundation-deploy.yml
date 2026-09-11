@@ -45,6 +45,12 @@ jobs:
         run: pnpm --dir server exec tsc --noEmit
       - run: pnpm --filter @paperclipai/ui typecheck
       - run: pnpm --filter @paperclipai/ui build
+      # The deploy rewrites the task definition with a jq filter held in a bash
+      # single-quoted string, and a stray apostrophe truncates it — a failure
+      # that only surfaces after a full image build. Compile the filters here,
+      # where it costs seconds.
+      - name: Check the deploy jq filters compile
+        run: node scripts/check-deploy-workflow-jq.mjs
 
   build-and-deploy-development:
     needs: verify
