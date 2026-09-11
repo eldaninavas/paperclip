@@ -325,9 +325,27 @@ timeout del adapter**: es el comando PRP esperando la respuesta de AgentCore y
 agotando su propia espera. Coherente con lo medido antes invocando el harness a
 mano, que tardaba entre 30 y 60 s en devolver `max_iterations_exceeded`.
 
-**Siguiente paso:** revisar el timeout del comando PRP `turn.start` en el control
-plane (y el `maxIterations`/`timeoutSeconds` del perfil AgentCore, hoy 8/300).
-El harness responde, pero más lento de lo que el runner espera.
+**Hecho:** eran **dos timeouts fijos de 30 s** en `runnerd-codex-transport.ts`
+(`#waitCommand` y `#waitForProviderIdentity`), pensados para un provider local
+que responde en milisegundos. AgentCore tarda 30-60 s, así que ambos expiraban
+mientras el harness seguía trabajando, y el fallo se registraba como error de
+transporte en vez de como lo que era. Ahora se configuran con
+`PAPERCLIP_RUNNER_COMMAND_TIMEOUT_MS` (default 30 s, tope 15 min).
+
+**Estado tras el arreglo:** el run pasa de `turn.start timed out` a
+`runnerd did not report its provider identity`. Es decir, avanza de fase pero el
+provider remoto todavía no llega a anunciarse en el tiempo disponible.
+
+**Siguiente hilo:** instrumentar qué hace el runnerd entre que arranca el
+provider AgentCore y que reporta identidad — probablemente sigue esperando la
+primera respuesta del harness, que sin el contrato `finish`/`block` termina en
+`max_iterations_exceeded` (lo mismo que devolvía la invocación manual). Conviene
+mirar juntos el `maxIterations` del perfil (hoy 8) y ese contrato, porque puede
+que no haya un timeout que arreglar sino un turno que nunca cierra.
+
+**Para el deploy:** si se activa la ruta AgentCore en ECS, hay que poner
+`PAPERCLIP_RUNNER_COMMAND_TIMEOUT_MS=300000` en la task definition; con 30 s no
+funcionará.
 
 **Nota de diagnóstico que ahorra tiempo:** el primer error que vi con este montaje
 era mío, no del sistema — mi endpoint servía `Expiration` con offset `+00:00` y el
