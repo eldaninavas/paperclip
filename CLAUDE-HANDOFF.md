@@ -371,14 +371,32 @@ evento de contenido. Es exactamente el síntoma de todos los runs de esta sesió
 El modelo **sí** se invoca — `model_call_count` sube en Memory — pero su salida
 nunca llega al stream porque no tiene herramienta que usar.
 
-**Corrección pendiente:** `AllowedTools` debe admitir las inline functions del
-contrato. No apliqué el cambio porque no tengo confirmada la sintaxis que
-AgentCore espera para permitir inline functions (si es `paperclip_*` a secas,
-`*`, o una forma distinta del patrón MCP); inventarla y redesplegar el harness a
-ciegas habría sido peor que dejarlo documentado. **Es el siguiente paso y muy
-probablemente el último**: con las herramientas permitidas, el turno cierra, y
-con el turno cerrado llegan la identidad del provider, el resultado y la fila de
-`cost_events`.
+**Corrección aplicada, con resultado parcial.** El schema del servicio confirma
+que un `allowedTool` admite un nombre simple (`(\*|@?[^/]+(/[^/]+)?)`), así que
+añadí `paperclip_*`. Harness actualizado a la **versión 2**, endpoint `paperclip`
+apuntando a v2, ambos `READY`.
+
+**Qué cambió y qué no:**
+
+| | Antes | Después |
+|---|---|---|
+| Invocación manual con `paperclip_finish` | falla en 36 s | falla en 76 s |
+| Run del agente vía runner | falla en 30-75 s | **corre 25 min** y luego falla |
+
+El turno claramente progresa más, pero **el run sigue terminando en
+`runnerd did not report its provider identity`**, incluso con el wait a 10
+minutos. El provider sólo emite identidad tras una respuesta del harness, y esa
+respuesta sigue sin llegar.
+
+**Honestamente: mi hipótesis era correcta pero incompleta.** El patrón MCP no
+podía casar inline functions —eso es un defecto real y el arreglo se queda— pero
+no era la única causa. Queda algo más entre el `toolUse` del modelo y el
+`toolResult` que debe devolver el runner.
+
+**Siguiente paso sugerido:** capturar el stream de `InvokeHarness` desde el
+runner (no desde un script externo) para ver si el modelo llega a emitir
+`toolUse` de `paperclip_finish` y qué hace el runner con él. Ahí está la pieza
+que falta.
 
 ### Diagnóstico previo (correcto pero incompleto): parecía un timeout
 
