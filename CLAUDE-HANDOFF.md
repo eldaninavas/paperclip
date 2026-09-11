@@ -336,6 +336,12 @@ transporte en vez de como lo que era. Ahora se configuran con
 `runnerd did not report its provider identity`. Es decir, avanza de fase pero el
 provider remoto todavía no llega a anunciarse en el tiempo disponible.
 
+**Dato del último run:** el run log del runner contiene una sola línea —
+`[paperclip-runner] transport mode=local_loopback state=connecting` — y nunca
+`connected`. En el run anterior sí había subido el contexto a S3, así que las
+fases no son estables entre intentos: conviene verificar primero que el
+transporte PRP se establece antes de seguir mirando AgentCore.
+
 **Siguiente hilo:** instrumentar qué hace el runnerd entre que arranca el
 provider AgentCore y que reporta identidad — probablemente sigue esperando la
 primera respuesta del harness, que sin el contrato `finish`/`block` termina en
