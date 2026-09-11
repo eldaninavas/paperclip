@@ -445,6 +445,19 @@ en esos tokens concretos — contra 100% por debajo antes. El arreglo exacto
 necesita una columna en `cost_events` para que la fila siga siendo recomputable;
 `resolveBedrockCostUsd` ya acepta el argumento `cacheWriteInputTokens`.
 
+#### Por qué cada deploy tardaba diez minutos de más (resuelto)
+
+`aws elbv2 wait target-in-service` sin `--targets` espera a que **todos** los
+targets registrados estén en servicio, y el que acaba de reemplazar el deploy se
+queda en `draining` durante el deregistration delay. Confirmado con
+`Foundation diagnostics` sobre `foundation-dev`: el target group tenía un target
+`healthy` y otro `draining`, el servicio ya estaba sirviendo la imagen nueva, y
+el paso seguía bloqueado.
+
+Ahora el deploy comprueba lo que de verdad le importa —que exista al menos un
+target sano— con el mismo presupuesto de 10 minutos, y si no aparece ninguno
+vuelca el estado del target group.
+
 #### Por qué dev siempre respondía 503 (resuelto)
 
 No era un fallo del despliegue. `foundation-deploy.yml` **apaga dev a propósito**
