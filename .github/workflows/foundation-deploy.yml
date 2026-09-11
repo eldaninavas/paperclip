@@ -54,7 +54,7 @@ jobs:
       # single-quoted string, and a stray apostrophe truncates it — a failure
       # that only surfaces after a full image build. Compile the filters here,
       # where it costs seconds.
-      - name: Check the deploy jq filters compile
+      - name: Check the deploy jq filters and shell parse
         run: node scripts/check-deploy-workflow-jq.mjs
 
   build-and-deploy-development:
