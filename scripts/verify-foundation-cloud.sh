@@ -153,6 +153,20 @@ print('' if b is None else f\"{b.get('priced')}|{b.get('model','(oculto sin sesi
       False\|*) bad "modelo SIN tarifa (${billing#*|}): cada run se registraría a 0 centavos" ;;
       *)        note "la instancia no reporta foundationCloudBilling (imagen anterior a este cambio)" ;;
     esac
+    # The instance probes object storage once per process. This is the only
+    # check that exercises the credential chain from inside the task rather
+    # than simulating it from outside, so it is the one that would catch a
+    # container that cannot reach the bucket its tenants' output depends on.
+    mirror="$(printf '%s' "$body" | python3 -c "
+import json,sys
+m=json.load(sys.stdin).get('features',{}).get('runLogMirror')
+print('' if m is None else str(m.get('reachable')))" 2>/dev/null)"
+    case "$mirror" in
+      True)  ok "el contenedor alcanza el bucket de run logs (sonda desde dentro de la task)" ;;
+      False) bad "el contenedor NO alcanza el bucket: los outputs no saldrían de la task" ;;
+      None)  note "sonda de almacenamiento todavía sin responder; vuelve a pedir /api/health" ;;
+      *)     note "la instancia no reporta runLogMirror (imagen anterior a este cambio)" ;;
+    esac
   else
     bad "${HOST} no devolvió salud (¿token sin acceso a esta app?)"
   fi

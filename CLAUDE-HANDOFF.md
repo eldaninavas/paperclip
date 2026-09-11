@@ -398,12 +398,28 @@ Eso no es un test: es el contenedor en ECS diciendo que el modelo que tiene
 configurado (`global.anthropic.claude-sonnet-4-6`) sí tiene tarifa en el ledger,
 y que `RUN_LOG_S3_BUCKET` llegó hasta dentro.
 
-Falta una pieza más, ya en la rama: `runLogMirror.reachable`, una sola llamada
-`HeadObject` contra una clave inexistente en el primer health del proceso. Un 404
-prueba la cadena completa desde dentro de la task —credenciales del contenedor,
-red y bucket policy— sin necesidad de que ningún agente haya corrido. Es la
-respuesta más cercana a "los outputs llegan a S3 desde ECS" que se puede obtener
-sin cuota de Bedrock.
+**Y la pieza que faltaba, ya desplegada y verde** (`foundation-dev`, commit
+`ae1ab79e6`):
+
+```json
+"runLogMirror": { "reachable": true, "consecutiveFailures": 0 }
+```
+
+`reachable: true` significa que **el contenedor en ECS hizo un `HeadObject`
+contra `s3://paperclip-agentcore-foundation-runlogs-dev/run-logs/…` y recibió un
+404**. Eso ejercita la cadena entera desde dentro de la task:
+
+- las credenciales del rol de la task resuelven
+  (`AWS_CONTAINER_CREDENTIALS_RELATIVE_URI`),
+- hay ruta de red a S3 en `mx-central-1`,
+- y la bucket policy concede al rol.
+
+Es lo más cerca de *"los outputs de los tenants llegan a S3 desde ECS"* que se
+puede llegar sin cuota de Bedrock. Lo único que queda sin ejercitar es el
+`PutObject` en sí, y esa acción está en la misma policy sobre el mismo prefijo
+(simulada como `allowed` en el paso 1a).
+
+`scripts/verify-foundation-cloud.sh` lo asserta: **8 OK, 0 fallas**.
 
 #### Qué significa "harness por tenant_id", en concreto
 
