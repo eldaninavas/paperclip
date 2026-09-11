@@ -2968,7 +2968,10 @@ class DurablePrpCodexTransport implements CodexAppServerTransport {
   }
 
   async #waitForProviderIdentity(): Promise<void> {
-    const deadline = Date.now() + 30_000;
+    // Same reasoning as #waitCommand: a remote harness reports its identity only
+    // once the provider session is live on the far side, which is slower than any
+    // local process. Left on the same knob so the two waits cannot drift apart.
+    const deadline = Date.now() + resolveCommandTimeoutMs();
     while (Date.now() < deadline) {
       this.#throwIfFailed();
       this.#pumpEvents();
@@ -2986,7 +2989,13 @@ class DurablePrpCodexTransport implements CodexAppServerTransport {
   }
 
   async #waitCommand(type: string, commandId?: string): Promise<void> {
-    const deadline = Date.now() + 30_000;
+    // 30s suits a local provider that answers in milliseconds. A remote harness
+    // does not: AWS AgentCore takes 30-60s for a first turn, so every native
+    // AgentCore run died here as `PRP command turn.start timed out` — the wait
+    // expiring, not the provider failing. Configurable rather than simply
+    // raised, because a longer default would also slow down how quickly a genuinely
+    // stuck local provider is noticed.
+    const deadline = Date.now() + resolveCommandTimeoutMs();
     while (Date.now() < deadline) {
       this.#throwIfFailed();
       const command = this.#core?.store.state.commands.find((candidate) =>
@@ -3547,6 +3556,23 @@ class DurablePrpCodexTransport implements CodexAppServerTransport {
   #publish(): void {
     this.options.onEvidence?.(this.evidence());
   }
+}
+
+/**
+ * How long to wait for a durable PRP command to complete.
+ *
+ * Defaults to the historical 30s. Deployments whose provider is a remote
+ * service — AWS AgentCore, Claude Managed — should raise it to at least the
+ * provider's own turn timeout, or the control plane gives up while the harness
+ * is still working and the run is recorded as a transport failure.
+ */
+function resolveCommandTimeoutMs(): number {
+  const raw = process.env.PAPERCLIP_RUNNER_COMMAND_TIMEOUT_MS;
+  if (raw === undefined) return 30_000;
+  const parsed = Number.parseInt(raw, 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) return 30_000;
+  // Bounded so a typo cannot hang a run indefinitely.
+  return Math.min(parsed, 900_000);
 }
 
 export function defaultCapabilityRunnerdBinary(): string {
