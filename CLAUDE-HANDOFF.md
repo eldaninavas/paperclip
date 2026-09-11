@@ -297,6 +297,43 @@ Para que yo pueda hacerlo sin ti la próxima vez, añade a
 `arn:aws:iam::523859314550:role/foundation-*-ecs-task`. No es admin: sigue sin
 poder tocar ECS, RDS ni crear roles nuevos.
 
+### AVANCE FINAL: la cadena llega hasta AgentCore y sube el contexto
+
+Simulé en local el endpoint de credenciales de ECS (`AWS_CONTAINER_CREDENTIALS_FULL_URI`
+sobre loopback, sirviendo credenciales STS en el formato del contenedor), que es
+exactamente el mecanismo de producción. Con eso, y con el arreglo de la
+allowlist, el runner recorre toda la secuencia:
+
+| Etapa | Estado |
+|---|---|
+| Credenciales base llegan al runner | ✅ |
+| Asume el rol de invocación | ✅ |
+| Construye el bundle de instrucciones | ✅ |
+| **Sube el runtime context a S3, cifrado con KMS** | ✅ |
+| `turn.start` contra AgentCore | ❌ timeout |
+
+Evidencia del upload en el bucket de contexto del stack:
+
+```
+assets/0e28ffcd…/SKILL.md                 180 B
+assets/0e28ffcd…/instructions/AGENTS.md  4051 B
+```
+
+El fallo restante es `provider_transport_failed: PRP command turn.start timed
+out`, con `timeoutFired: false` y `effectiveTimeoutSec: 0` — o sea, **no es el
+timeout del adapter**: es el comando PRP esperando la respuesta de AgentCore y
+agotando su propia espera. Coherente con lo medido antes invocando el harness a
+mano, que tardaba entre 30 y 60 s en devolver `max_iterations_exceeded`.
+
+**Siguiente paso:** revisar el timeout del comando PRP `turn.start` en el control
+plane (y el `maxIterations`/`timeoutSeconds` del perfil AgentCore, hoy 8/300).
+El harness responde, pero más lento de lo que el runner espera.
+
+**Nota de diagnóstico que ahorra tiempo:** el primer error que vi con este montaje
+era mío, no del sistema — mi endpoint servía `Expiration` con offset `+00:00` y el
+SDK de Rust (Smithy) exige sufijo `Z`. Si alguien reproduce este experimento, use
+formato Zulu.
+
 ### PROBADO END-TO-END con un servidor Foundation real (madrugada)
 
 Levanté el servidor Foundation **en local** (Postgres embebido, puerto 3199), que
