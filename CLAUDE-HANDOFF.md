@@ -329,6 +329,33 @@ gh workflow run foundation-deploy.yml --repo eldaninavas/paperclip \
   -f keep_development_running=true
 ```
 
+#### Estado verificado de `foundation-dev` (2026-09-11, 20:20 UTC)
+
+```
+GET https://foundation-dev.davaria.app/api/health  →  200
+  commit:          fb37ef0b90dbff2c9df13bfffc3798f054fe497a
+  deploymentMode:  authenticated
+  features:        foundationCloudExecutionEnabled = true
+  bootstrapStatus: bootstrap_pending
+```
+
+Dev **está arriba y sana** con la rama desplegada, y el paso
+`Scale development back to zero` quedó omitido, que era el objetivo de la
+bandera. Sigue arriba y **cobrando** hasta que alguien despliegue sin ella.
+
+`bootstrapStatus: bootstrap_pending` significa que **ningún admin ha reclamado
+esa instancia**: la base está vacía, no hay empresa ni agente. Reclamarla crea
+una identidad a tu nombre, así que eso te toca a ti: abre
+`https://foundation-dev.davaria.app/` y pulsa *Sign in / Create account*. A
+partir de ahí se puede crear la empresa, el perfil de AgentCore y el agente.
+
+**Matiz importante sobre "outputs en S3 por tenant":** está probado de verdad
+—hay 10 run logs reales bajo `run-logs/<companyId>/<agentId>/<runId>.ndjson`,
+con contenido de ejecución— pero los escribió un **servidor Foundation local**
+de esta madrugada, no la instancia desplegada. La base de dev se creó de cero
+después. La ruta de código es la misma; lo que falta por ver es esa misma ruta
+corriendo dentro de ECS, y para eso hace falta reclamar dev.
+
 **Falta en prod:** la misma política `FoundationCloudBedrockInvoke` sobre
 `foundation-prod-ecs-task`. Es aditiva y no toca el servicio en marcha, pero es
 un cambio en producción y queda a tu autorización:
