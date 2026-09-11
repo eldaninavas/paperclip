@@ -1,7 +1,68 @@
 # Foundation — handoff operativo
 
-> Actualizado 2026-09-11 (sesión nocturna). Ver **Estado actual** al final: hay
-> un paso bloqueado que requiere al fundador.
+> Actualizado 2026-09-11 (sesión nocturna).
+
+## Al despertar: cuatro cosas, en este orden
+
+Todo lo demás de este documento es contexto. Esto es lo que hay que hacer.
+
+**1. Correo a AWS (2 minutos). Desbloquea todo lo demás.**
+
+Desde el correo de la cuenta, a `aws-verification@amazon.com`:
+
+> Account 523859314550. Every Bedrock on-demand inference quota is 0 while the
+> rest of our Bedrock quotas carry normal values: of 184 Claude quotas in
+> us-east-1, all 66 batch inference and both model customization quotas are
+> seeded, and all 33 on-demand cross-region inference quotas are 0. The same
+> split appears in us-west-2 and mx-central-1. `L-248E47B7` has an AWS default of
+> 8,640,000,000 and an applied value of 0, and is not adjustable. Model access is
+> granted and the use case form is submitted in four regions. A self-service
+> increase is refused because the requested value must exceed a default the
+> account does not have. Please seed the on-demand inference quotas for this
+> account.
+
+Si prefieren un caso formal: consola → Support → Create case → *Account and
+Billing* (disponible en soporte Basic), mismo texto.
+
+**2. Reclamar `foundation-dev` (1 minuto).**
+
+Abre `https://foundation-dev.davaria.app/` → *Sign in / Create account*. **Tiene
+que hacerlo un humano y tiene que ser quien vaya a ser el admin:** el primer
+claim es irreversible y de un solo uso (`claimFirstInstanceAdmin` devuelve
+`already_claimed` para siempre). Por eso esta sesión no lo hizo — reclamarla
+habría dejado la instancia a nombre de nadie y sin forma de recuperarla.
+
+Con la instancia reclamada se puede crear la empresa, el perfil de AgentCore
+(recordando el `contextPrefix` con el `company_id`) y el agente.
+
+**3. Bajar dev cuando termines.** Está arriba y cobrando:
+
+```
+gh workflow run foundation-deploy.yml --repo eldaninavas/paperclip \
+  --ref foundation-cloud-bedrock -f deploy_production=false
+```
+
+(sin `keep_development_running`, que es lo que lo deja encendido)
+
+**4. Sólo si quieres probar en prod:** la política de Bedrock en su rol de task.
+Es aditiva y no toca el servicio, pero es producción y requiere tu visto bueno.
+
+```
+aws --profile foundation-ops iam put-role-policy \
+  --role-name foundation-prod-ecs-task \
+  --policy-name FoundationCloudBedrockInvoke \
+  --policy-document file://<el mismo documento que dev>
+```
+
+### Qué está verificado y qué no
+
+| | Estado |
+|---|---|
+| Cobro medible | **Verificado.** Tarifas contra el rate card en vivo, fila de `cost_events` con centavos reales contra Postgres, tope de presupuesto que pausa la empresa, y un solo sitio que calcula el precio. |
+| Outputs a S3 por tenant | **Verificado hasta donde llega sin cuota.** El contenedor en ECS lee, escribe y borra en el bucket con sus propias credenciales. Falta que un agente real produzca el output. |
+| Harness por tenant_id | **Verificado.** Perfil, run logs, memoria y contexto, los cuatro separados por tenant. |
+| Tenants despliegan on-demand | Autorización verificada en código. Falta el paso 2. |
+| Agentes ejecutándose | **Bloqueado por AWS.** Paso 1. |
 
 ## Producto y dirección
 
