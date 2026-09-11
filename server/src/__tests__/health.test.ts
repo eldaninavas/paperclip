@@ -348,6 +348,46 @@ describe("GET /health", () => {
     });
   });
 
+  it("tells an unauthenticated probe whether the model is billable, without naming it", async () => {
+    // The deploy checks health without a session, and an unpriced model is
+    // exactly what that check should catch. The model id stays behind auth.
+    const { healthRoutes } = await import("../routes/health.js");
+    const db = {
+      execute: vi.fn().mockResolvedValue([{ "?column?": 1 }]),
+      select: vi.fn(() => ({
+        from: vi.fn(() => ({
+          where: vi.fn().mockResolvedValue([{ count: 1 }]),
+        })),
+      })),
+    } as unknown as Db;
+    const app = express();
+    app.use((req, _res, next) => {
+      (req as never as { actor: unknown }).actor = { type: "none", source: "none" };
+      next();
+    });
+    app.use(
+      "/health",
+      healthRoutes(db, {
+        deploymentMode: "authenticated",
+        deploymentExposure: "public",
+        authReady: true,
+        companyDeletionEnabled: false,
+        serverInfo: testServerInfo,
+        runtimeEnv: {
+          FOUNDATION_CLOUD_EXECUTION: "true",
+          CLAUDE_CODE_USE_BEDROCK: "1",
+          ANTHROPIC_MODEL: "global.anthropic.claude-opus-5",
+        },
+      }),
+    );
+
+    const res = await request(app).get("/health");
+
+    expect(res.body.features?.foundationCloudExecutionEnabled).toBe(true);
+    expect(res.body.features?.foundationCloudBilling).toEqual({ priced: false });
+    expect(JSON.stringify(res.body)).not.toContain("claude-opus-5");
+  });
+
   it("surfaces redacted database backup warnings for anonymous authenticated probes", async () => {
     const backupDir = fs.mkdtempSync(path.join(os.tmpdir(), "paperclip-health-redacted-backups-"));
     const backupFile = path.join(backupDir, "paperclip-20260705-031702.sql.gz");

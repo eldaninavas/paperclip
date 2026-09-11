@@ -332,7 +332,25 @@ export function healthRoutes(
         bootstrapStatus,
         bootstrapInviteActive,
         ...(isTruthyEnvValue(runtimeEnv.FOUNDATION_CLOUD_EXECUTION)
-          ? { features: { foundationCloudExecutionEnabled: true } }
+          ? {
+              features: {
+                foundationCloudExecutionEnabled: true,
+                // Whether the configured model has a rate, without naming it.
+                // A deploy check runs unauthenticated, and an unpriced model is
+                // exactly the failure that check should catch; the model id
+                // itself stays in the authenticated payload.
+                ...(foundationCloudBilling
+                  ? { foundationCloudBilling: { priced: foundationCloudBilling.priced } }
+                  : {}),
+                ...(runLogMirror.configured
+                  ? {
+                      runLogMirror: {
+                        consecutiveFailures: runLogMirror.consecutiveFailures,
+                      },
+                    }
+                  : {}),
+              },
+            }
           : {}),
         ...(redactedDatabaseBackup ? { databaseBackup: redactedDatabaseBackup } : {}),
         ...(redactedWarnings ? { warnings: redactedWarnings } : {}),

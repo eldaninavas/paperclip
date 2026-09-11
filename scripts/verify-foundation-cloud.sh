@@ -130,7 +130,7 @@ print(d.get('features',{}).get(f, d.get(f,'—')))" "$field" 2>/dev/null)"
     billing="$(printf '%s' "$body" | python3 -c "
 import json,sys
 b=json.load(sys.stdin).get('features',{}).get('foundationCloudBilling')
-print('' if b is None else f\"{b.get('priced')}|{b.get('model')}\")" 2>/dev/null)"
+print('' if b is None else f\"{b.get('priced')}|{b.get('model','(oculto sin sesion)')}\")" 2>/dev/null)"
     case "$billing" in
       True\|*)  ok "modelo facturable: ${billing#*|}" ;;
       False\|*) bad "modelo SIN tarifa (${billing#*|}): cada run se registraría a 0 centavos" ;;
