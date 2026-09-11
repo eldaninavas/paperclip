@@ -892,11 +892,18 @@ no depende del `explicitDeny` de ECS, y recorrí el camino completo de un tenant
 **Dos requisitos quedan demostrados, no inferidos:**
 
 1. **Outputs en S3 por tenant.** Logs de runs reales del servidor, con contenido
-   legible, segmentados por company y agente. Ya no se quedan en el disco de la
-   task.
+   legible, segmentados por company y agente. **Matiz:** ese servidor era local.
+   La misma ruta de código corriendo dentro de ECS todavía no se ha visto; hace
+   falta reclamar dev. Ver el estado verificado de `foundation-dev` arriba.
 2. **El perfil AgentCore se crea y se firma.** Esto sólo funciona gracias a la
    corrección de `qualificationRevision`: antes, el servidor rechazaba cualquier
    perfil generado desde este stack.
+
+   **Al repetirlo habrá un requisito más:** el `contextPrefix` tiene que llevar
+   el `company_id` como segmento (p. ej.
+   `paperclip/agentcore/paperclip-agentcore-development/<companyId>`), no el
+   valor tal cual sale de CloudFormation. Es el arreglo de aislamiento de
+   contexto descrito arriba.
 
 **Dónde se detiene:**
 
