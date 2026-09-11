@@ -26,7 +26,7 @@ const AWS_CONFIGURATION = {
   memoryId: "memory-example",
   invocationRoleArn: "arn:aws:iam::123456789012:role/paperclip-runner",
   contextBucket: "paperclip-runner-context",
-  contextPrefix: "profiles/example",
+  contextPrefix: `companies/${COMPANY_ID}/profiles/example`,
   contextKmsKeyArn: "arn:aws:kms:us-east-1:123456789012:key/example",
   qualificationRevision: "aws-agentcore-harness-v1",
   defaultModel: "global.anthropic.claude-sonnet-4-6",
@@ -571,5 +571,50 @@ describe("remote agent profile metadata validation", () => {
         updatedAt: new Date("2026-08-01T00:00:00.000Z"),
       })).requireQualified(COMPANY_ID, "agentcore"),
     ).rejects.toThrow("does not match its qualified revision");
+  });
+});
+
+describe("AgentCore context prefix isolation", () => {
+  it("refuses a context prefix that does not name the tenant", async () => {
+    // The AgentCore stack emits one contextPrefix for the whole deployment, so
+    // pasting it into every company's profile is the obvious mistake and puts
+    // every tenant's runtime context in one namespace.
+    await expect(
+      remoteAgentProfileService(unusedDb).upsert(COMPANY_ID, {
+        ...remoteInput(),
+        configuration: {
+          ...AWS_CONFIGURATION,
+          contextPrefix: "paperclip/agentcore/paperclip-agentcore-development",
+        },
+      }),
+    ).rejects.toThrow(/contextPrefix must contain this company/);
+  });
+
+  it("accepts a prefix carrying the company id as its own segment", async () => {
+    // Validation is all this suite can reach: the fixture database throws on
+    // first use, so getting as far as the lookup is what "accepted" means here.
+    await expect(
+      remoteAgentProfileService(unusedDb).upsert(COMPANY_ID, {
+        ...remoteInput(),
+        configuration: {
+          ...AWS_CONFIGURATION,
+          contextPrefix: `paperclip/agentcore/dev/${COMPANY_ID}`,
+        },
+      }),
+    ).rejects.toThrow(/validation unexpectedly accessed the database/);
+  });
+
+  it("does not accept the id merely appearing inside a longer segment", async () => {
+    // `.../tenant-<id>-archive` shares a namespace with anything else matching
+    // the same pattern; only a whole segment separates one tenant from another.
+    await expect(
+      remoteAgentProfileService(unusedDb).upsert(COMPANY_ID, {
+        ...remoteInput(),
+        configuration: {
+          ...AWS_CONFIGURATION,
+          contextPrefix: `paperclip/agentcore/tenant-${COMPANY_ID}-archive`,
+        },
+      }),
+    ).rejects.toThrow(/contextPrefix must contain this company/);
   });
 });

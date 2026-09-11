@@ -101,6 +101,30 @@ function validateConfiguration(service: RemoteAgentService, configuration: Recor
   }
 }
 
+/**
+ * Why a tenant's context prefix has to name the tenant.
+ *
+ * The AgentCore stack emits one contextPrefix for the whole deployment, and the
+ * runner uploads every session's workspace to `<contextPrefix>/assets/<digest>`.
+ * Paste that one value into every company's profile -- the obvious thing to do,
+ * since it is what CloudFormation hands you -- and every tenant's context lands
+ * in one namespace in one bucket, reachable by every other tenant's runner.
+ *
+ * Checked when a profile is written rather than when a run starts: a profile
+ * already qualified under the old rule keeps working, and editing it means
+ * re-qualifying anyway, so this cannot strand the only profile an instance has.
+ */
+function assertContextPrefixIsTenantScoped(
+  companyId: string,
+  configuration: Record<string, unknown>,
+) {
+  const prefix = String(configuration.contextPrefix ?? "");
+  if (prefix.split("/").includes(companyId)) return;
+  throw unprocessable(
+    `configuration.contextPrefix must contain this company's id as a path segment (${companyId}), so one tenant's runtime context cannot land in another tenant's namespace`,
+  );
+}
+
 export function computeRemoteAgentProfileRevision(input: {
   service: RemoteAgentService;
   configuration: Record<string, unknown>;
@@ -238,6 +262,7 @@ export function remoteAgentProfileService(db: Db) {
       "Remote Agent profile",
     );
     validateConfiguration(input.service, configuration);
+    assertContextPrefixIsTenantScoped(companyId, configuration);
     if (input.enabled && !input.retentionAcknowledged) {
       throw unprocessable("Enabling a remote agent requires retention acknowledgement");
     }
