@@ -101,18 +101,35 @@ else
 fi
 echo
 
-echo "4. Instancia desplegada (requiere service token de Cloudflare Access)"
+echo "4. Instancia desplegada (service token de Cloudflare, o FOUNDATION_HEALTH_JSON)"
 # Cloudflare Access fronts both hosts, so an unauthenticated probe only ever sees
 # a 302 to its login page. A service token is the supported way to call the API
-# programmatically; without one this section reports what it cannot check rather
-# than guessing the instance is healthy.
+# programmatically, and a health response saved from a logged-in browser is the
+# other. With neither, this section reports what it cannot check rather than
+# guessing the instance is healthy.
 HOST="foundation-${ENVIRONMENT}.davaria.app"
 [[ "$ENVIRONMENT" == "prod" ]] && HOST="foundation.davaria.app"
-if [[ -n "${CF_ACCESS_CLIENT_ID:-}" && -n "${CF_ACCESS_CLIENT_SECRET:-}" ]]; then
+# A saved payload is the other way in. Cloudflare Access will hand a browser the
+# real response after a human login, and that response answers every question
+# below; refusing to look at it because it did not arrive over curl would leave
+# the deployment unverified for no reason.
+if [[ -n "${FOUNDATION_HEALTH_JSON:-}" ]]; then
+  body="$(cat "${FOUNDATION_HEALTH_JSON}" 2>/dev/null)"
+  note "usando la respuesta guardada en ${FOUNDATION_HEALTH_JSON}"
+  if printf '%s' "$body" | grep -q '"status"'; then
+    :
+  else
+    bad "${FOUNDATION_HEALTH_JSON} no contiene una respuesta de /api/health"
+    body=""
+  fi
+elif [[ -n "${CF_ACCESS_CLIENT_ID:-}" && -n "${CF_ACCESS_CLIENT_SECRET:-}" ]]; then
   body="$(curl -s --max-time 25 \
     -H "CF-Access-Client-Id: ${CF_ACCESS_CLIENT_ID}" \
     -H "CF-Access-Client-Secret: ${CF_ACCESS_CLIENT_SECRET}" \
     "https://${HOST}/api/health")"
+fi
+
+if [[ -n "${body:-}" ]]; then
   if printf '%s' "$body" | grep -q '"status"'; then
     ok "salud de ${HOST} alcanzada"
     for field in foundationCloudExecutionEnabled commit; do
@@ -137,12 +154,13 @@ print('' if b is None else f\"{b.get('priced')}|{b.get('model','(oculto sin sesi
       *)        note "la instancia no reporta foundationCloudBilling (imagen anterior a este cambio)" ;;
     esac
   else
-    bad "${HOST} no devolvió salud con el service token (¿token sin acceso a esta app?)"
+    bad "${HOST} no devolvió salud (¿token sin acceso a esta app?)"
   fi
 else
   status="$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "https://${HOST}/api/health")"
-  bad "sin service token: ${HOST} responde HTTP ${status} (login de Cloudflare)"
-  note "Exporta CF_ACCESS_CLIENT_ID y CF_ACCESS_CLIENT_SECRET para verificar el despliegue."
+  bad "sin forma de leer la instancia: ${HOST} responde HTTP ${status} (login de Cloudflare)"
+  note "Exporta CF_ACCESS_CLIENT_ID y CF_ACCESS_CLIENT_SECRET,"
+  note "o guarda la respuesta de /api/health y exporta FOUNDATION_HEALTH_JSON=<ruta>."
 fi
 echo
 
