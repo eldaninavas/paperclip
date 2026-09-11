@@ -431,6 +431,23 @@ Es decir: no depende del endpoint, ni de las herramientas, ni del contrato de
 completación, ni de nada que hayamos configurado nosotros. **Un harness recién
 creado no responde a un "Di OK".** Ése es el repro para AWS, y cabe en un párrafo.
 
+**Todo lo nuestro verificado, uno por uno:**
+
+| Comprobación | Resultado |
+|---|---|
+| Acuerdo del modelo en la región | `AVAILABLE` |
+| Rol de ejecución → `InvokeModelWithResponseStream` sobre el inference profile | `allowed` |
+| Íd. sobre los foundation models (us-east-1 y us-west-2) | `allowed` |
+| Agent Runtime | `READY`, v2, imagen gestionada de AWS, red `PUBLIC` |
+| Harness | `READY`, v2 |
+| Endpoint (`paperclip`, `DEFAULT`, sin qualifier) | `READY`, los tres se comportan igual |
+| Memory | activa, `model_call_count` incrementa |
+| `AllowedTools` | corregido para admitir el contrato inline |
+| Subida del runtime context a S3 | funciona, objetos cifrados presentes |
+
+Con todo eso en verde, `InvokeHarness` sigue devolviendo un único evento
+`messageStop / max_iterations_exceeded` ante un `"Di OK"` sin herramientas.
+
 **Lo que yo haría a continuación, por orden de coste:**
 1. Abrir un caso con AWS Support con esta traza: *"InvokeHarness returns only
    messageStop/max_iterations_exceeded, no content events, while Memory shows
