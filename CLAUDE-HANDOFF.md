@@ -384,6 +384,27 @@ tarde y caro.
 
 `scripts/verify-foundation-cloud.sh` ya asserta lo primero.
 
+**Verificado en la instancia desplegada** (`foundation-dev`, commit `eaa4561c2`):
+
+```json
+"features": {
+  "foundationCloudExecutionEnabled": true,
+  "foundationCloudBilling": { "priced": true },
+  "runLogMirror": { "consecutiveFailures": 0 }
+}
+```
+
+Eso no es un test: es el contenedor en ECS diciendo que el modelo que tiene
+configurado (`global.anthropic.claude-sonnet-4-6`) sí tiene tarifa en el ledger,
+y que `RUN_LOG_S3_BUCKET` llegó hasta dentro.
+
+Falta una pieza más, ya en la rama: `runLogMirror.reachable`, una sola llamada
+`HeadObject` contra una clave inexistente en el primer health del proceso. Un 404
+prueba la cadena completa desde dentro de la task —credenciales del contenedor,
+red y bucket policy— sin necesidad de que ningún agente haya corrido. Es la
+respuesta más cercana a "los outputs llegan a S3 desde ECS" que se puede obtener
+sin cuota de Bedrock.
+
 #### Qué significa "harness por tenant_id", en concreto
 
 Revisado a fondo, porque era tu pregunta original. Cuatro piezas, tres ya
