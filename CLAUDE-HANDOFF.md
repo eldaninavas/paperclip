@@ -138,6 +138,19 @@ políticas basadas en recurso.
 
 Para que yo pueda hacerlo sin ti la próxima vez, añade a `FoundationAgentCoreProvisioning` un statement con `iam:PutRolePolicy`/`GetRolePolicy`/`DeleteRolePolicy` sobre `arn:aws:iam::523859314550:role/foundation-*-ecs-task`. No es admin: sigue sin poder tocar ECS, RDS ni crear roles nuevos.
 
+### Detalle a vigilar: catálogo de modelos vs. región
+
+`packages/adapters/claude-local/src/server/models.ts` publica modelos Bedrock con
+prefijo `us.` (`us.anthropic.claude-opus-4-8`, etc.), pero en `mx-central-1` los
+inference profiles activos son `global.anthropic.claude-sonnet-4-6` y
+`global.anthropic.claude-haiku-4-5-...`. Por eso el deploy fija
+`ANTHROPIC_MODEL=global.anthropic.claude-sonnet-4-6` como valor por defecto.
+
+Si un tenant elige desde la UI un modelo `us.*`, fallará en esta región. No es
+bloqueante hoy (el default manda), pero antes de exponer el selector de modelo a
+clientes hay que filtrar el catálogo por los perfiles realmente disponibles en la
+región del cluster.
+
 ### Pendiente después de desbloquear
 
 1. Verificar un run real en dev: que `cost_events` tenga `costCents > 0` y `costStatus: reported`.
