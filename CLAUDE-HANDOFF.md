@@ -342,7 +342,45 @@ provider remoto todavía no llega a anunciarse en el tiempo disponible.
 fases no son estables entre intentos: conviene verificar primero que el
 transporte PRP se establece antes de seguir mirando AgentCore.
 
-### CONCLUSIÓN DEL DIAGNÓSTICO: no es un timeout, es un turno que no cierra
+### ⚠️ CAUSA RAÍZ: el harness bloquea sus propias herramientas de completación
+
+`infra/aws-agentcore-paperclip.yaml:283` configura el harness con:
+
+```yaml
+AllowedTools:
+  - "@*/pc_*"
+```
+
+Ese patrón tiene formato MCP (`@servidor/herramienta`) y exige prefijo `pc_`.
+Pero el contrato de Paperclip usa **`paperclip_finish`** y **`paperclip_block`**
+(`contracts/completion-result.ts:2-3`), entregadas como **inline functions**, que
+no tienen servidor. **Ninguna puede casar nunca con ese patrón.**
+
+Consecuencia: el modelo no puede invocar ninguna herramienta, agota sus 8
+iteraciones y el harness devuelve `max_iterations_exceeded` sin emitir un solo
+evento de contenido. Es exactamente el síntoma de todos los runs de esta sesión.
+
+**Verificado contra el harness real, tres veces:**
+
+| Prueba | Resultado |
+|---|---|
+| tool `finish` (nombre improvisado) | `max_iterations_exceeded`, 0 eventos |
+| tool `paperclip_finish` (nombre real del contrato) | `max_iterations_exceeded`, 0 eventos |
+| tool `pc_finish` (casa el prefijo, pero sigue siendo inline) | `max_iterations_exceeded`, 0 eventos |
+
+El modelo **sí** se invoca — `model_call_count` sube en Memory — pero su salida
+nunca llega al stream porque no tiene herramienta que usar.
+
+**Corrección pendiente:** `AllowedTools` debe admitir las inline functions del
+contrato. No apliqué el cambio porque no tengo confirmada la sintaxis que
+AgentCore espera para permitir inline functions (si es `paperclip_*` a secas,
+`*`, o una forma distinta del patrón MCP); inventarla y redesplegar el harness a
+ciegas habría sido peor que dejarlo documentado. **Es el siguiente paso y muy
+probablemente el último**: con las herramientas permitidas, el turno cierra, y
+con el turno cerrado llegan la identidad del provider, el resultado y la fila de
+`cost_events`.
+
+### Diagnóstico previo (correcto pero incompleto): parecía un timeout
 
 Con el estado durable borrado y los timeouts a 300 s, el run sigue fallando con
 `runnerd did not report its provider identity`. Rastreado hasta el final:
