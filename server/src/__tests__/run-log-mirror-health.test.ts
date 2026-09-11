@@ -6,12 +6,19 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   beginRunLogMirrorProbe,
   createDurableRunLogStore,
+  probeRunLogMirror,
   runLogMirrorHealth,
 } from "../services/run-log-store.ts";
 
-function objectStorage(behaviour: { fail?: Error } = {}) {
+function objectStorage(
+  behaviour: { fail?: Error; failPut?: Error; failHead?: Error } = {},
+) {
+  const calls: string[] = [];
   return {
+    calls,
     async putObject(input: { body?: unknown }) {
+      calls.push("put");
+      if (behaviour.failPut) throw behaviour.failPut;
       // Drain the body the way a real client would. Left unread, the lazily
       // opened file stream outlives the test and reports ENOENT once the
       // temporary directory is gone.
@@ -28,7 +35,12 @@ function objectStorage(behaviour: { fail?: Error } = {}) {
       if (behaviour.fail) throw behaviour.fail;
     },
     async headObject() {
+      calls.push("head");
+      if (behaviour.failHead) throw behaviour.failHead;
       return { exists: false };
+    },
+    async deleteObject() {
+      calls.push("delete");
     },
     async getObject() {
       return { stream: Readable.from([]) };
@@ -133,5 +145,64 @@ describe("run log mirror health", () => {
       if (previous === undefined) delete process.env.RUN_LOG_S3_BUCKET;
       else process.env.RUN_LOG_S3_BUCKET = previous;
     }
+  });
+});
+describe("object storage probe", () => {
+  it("reads, writes and cleans up when the bucket policy allows all three", async () => {
+    const provider = objectStorage();
+    await probeRunLogMirror({ provider: provider as never, keyPrefix: "run-logs" });
+
+    expect(runLogMirrorHealth().reachable).toBe(true);
+    expect(runLogMirrorHealth().writable).toBe(true);
+    // The sentinel must not be left behind in a tenant output bucket.
+    expect(provider.calls).toEqual(["head", "put", "delete"]);
+  });
+
+  it("names a bucket that reads but refuses writes", async () => {
+    // The exact shape of a policy granting GetObject and not PutObject: the
+    // container looks healthy right up until a tenant's first run.
+    const denied = new Error("Access Denied");
+    denied.name = "AccessDenied";
+    const provider = objectStorage({ failPut: denied });
+
+    await probeRunLogMirror({ provider: provider as never, keyPrefix: "run-logs" });
+
+    expect(runLogMirrorHealth().reachable).toBe(true);
+    expect(runLogMirrorHealth().writable).toBe(false);
+    expect(runLogMirrorHealth().unwritableReason).toContain("AccessDenied");
+    expect(provider.calls).toEqual(["head", "put"]);
+  });
+
+  it("does not attempt a write when the read already failed", async () => {
+    // One missing credential explains both, and a second failure would only
+    // repeat the first with a less useful message.
+    const provider = objectStorage({ failHead: new Error("CredentialsNotLoaded") });
+
+    await probeRunLogMirror({ provider: provider as never, keyPrefix: "run-logs" });
+
+    expect(runLogMirrorHealth().reachable).toBe(false);
+    expect(provider.calls).toEqual(["head"]);
+  });
+
+  it("keeps the sentinel under the run-log prefix and out of tenant namespaces", async () => {
+    const keys: string[] = [];
+    const provider = {
+      async headObject(input: { objectKey: string }) {
+        keys.push(input.objectKey);
+        return { exists: false };
+      },
+      async putObject(input: { objectKey: string }) {
+        keys.push(input.objectKey);
+      },
+      async deleteObject(input: { objectKey: string }) {
+        keys.push(input.objectKey);
+      },
+    };
+
+    await probeRunLogMirror({ provider: provider as never, keyPrefix: "run-logs" });
+
+    // Same prefix as real objects so the same grant covers it, and dot-prefixed
+    // so it can never collide with a company id.
+    expect(new Set(keys)).toEqual(new Set(["run-logs/.foundation-mirror-probe"]));
   });
 });

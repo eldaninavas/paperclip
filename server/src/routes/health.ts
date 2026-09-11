@@ -353,6 +353,7 @@ export function healthRoutes(
                   ? {
                       runLogMirror: {
                         reachable: runLogMirror.reachable,
+                        writable: runLogMirror.writable,
                         consecutiveFailures: runLogMirror.consecutiveFailures,
                       },
                     }

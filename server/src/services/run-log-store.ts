@@ -30,13 +30,25 @@ export interface RunLogFinalizeSummary {
 }
 
 export interface RunLogStore {
-  begin(input: { companyId: string; agentId: string; runId: string }): Promise<RunLogHandle>;
+  begin(input: {
+    companyId: string;
+    agentId: string;
+    runId: string;
+  }): Promise<RunLogHandle>;
   append(
     handle: RunLogHandle,
-    event: { stream: "stdout" | "stderr" | "system"; chunk: string; ts: string; seq?: number },
+    event: {
+      stream: "stdout" | "stderr" | "system";
+      chunk: string;
+      ts: string;
+      seq?: number;
+    },
   ): Promise<number>;
   finalize(handle: RunLogHandle): Promise<RunLogFinalizeSummary>;
-  read(handle: RunLogHandle, opts?: RunLogReadOptions): Promise<RunLogReadResult>;
+  read(
+    handle: RunLogHandle,
+    opts?: RunLogReadOptions,
+  ): Promise<RunLogReadResult>;
   // Optional so existing fakes/fixtures keep compiling: uploads every dirty
   // in-flight mirror immediately (graceful-shutdown path). No-op when the
   // in-flight mirror is not enabled.
@@ -147,6 +159,17 @@ export interface RunLogMirrorHealth {
    */
   reachable: boolean | null;
   unreachableReason: string | null;
+  /**
+   * Whether this process could actually write to object storage and clean up
+   * after itself. `null` until the probe finishes.
+   *
+   * Reading proves credentials and network; it does not prove the bucket policy
+   * grants `s3:PutObject`, and a tenant's run log is a write. The two are
+   * reported separately because they fail for different reasons and need
+   * different fixes.
+   */
+  writable: boolean | null;
+  unwritableReason: string | null;
   uploads: number;
   failures: number;
   consecutiveFailures: number;
@@ -158,6 +181,8 @@ const mirrorHealth: RunLogMirrorHealth = {
   configured: false,
   reachable: null,
   unreachableReason: null,
+  writable: null,
+  unwritableReason: null,
   uploads: 0,
   failures: 0,
   consecutiveFailures: 0,
@@ -179,24 +204,70 @@ export function beginRunLogMirrorProbe(): void {
   if (mirrorProbe !== null) return;
   const s3 = resolveRunLogS3();
   if (!s3) return;
+  mirrorProbe = probeRunLogMirror(s3);
+}
+
+/**
+ * The probe itself: read, then write, then clean up.
+ *
+ * Separated from the once-per-process wrapper so each outcome can be tested
+ * against a stub. Writes into `mirrorHealth`; the returned promise resolves
+ * when the answer is in.
+ */
+export async function probeRunLogMirror(
+  s3: NonNullable<DurableRunLogStoreOptions["s3"]>,
+): Promise<void> {
   const prefix = normalizeKeyPrefix(s3.keyPrefix);
   // A key that should never exist. HeadObject answers 404 when credentials and
   // the bucket policy are in place, and throws otherwise.
   const probeKey = prefix
     ? `${prefix}/.foundation-mirror-probe`
     : ".foundation-mirror-probe";
-  mirrorProbe = s3.provider
-    .headObject({ objectKey: probeKey })
-    .then(() => {
-      mirrorHealth.reachable = true;
-      mirrorHealth.unreachableReason = null;
-    })
-    .catch((error: unknown) => {
-      mirrorHealth.reachable = false;
-      const name = error instanceof Error ? error.name : "Error";
-      const message = error instanceof Error ? error.message : String(error);
-      mirrorHealth.unreachableReason = `${name}: ${message}`.slice(0, 200);
+  const describe = (error: unknown): string => {
+    const name = error instanceof Error ? error.name : "Error";
+    const message = error instanceof Error ? error.message : String(error);
+    return `${name}: ${message}`.slice(0, 200);
+  };
+
+  try {
+    await s3.provider.headObject({ objectKey: probeKey });
+    mirrorHealth.reachable = true;
+    mirrorHealth.unreachableReason = null;
+  } catch (error) {
+    mirrorHealth.reachable = false;
+    mirrorHealth.unreachableReason = describe(error);
+    // A write cannot be judged when the read already failed: the same
+    // missing credential would explain both, and a second failure would
+    // only repeat the first.
+    return;
+  }
+
+  // Reading proves credentials and network. A tenant's run log is a write,
+  // and the bucket policy grants those separately, so the probe writes a
+  // sentinel and removes it. Same prefix as the real objects, so it is
+  // covered by the same grant; a dot-prefixed name so it cannot collide
+  // with a company id.
+  const sentinel = Buffer.from(`${new Date().toISOString()}\n`, "utf8");
+  try {
+    await s3.provider.putObject({
+      objectKey: probeKey,
+      body: sentinel,
+      contentType: "text/plain",
+      contentLength: sentinel.byteLength,
     });
+    mirrorHealth.writable = true;
+    mirrorHealth.unwritableReason = null;
+  } catch (error) {
+    mirrorHealth.writable = false;
+    mirrorHealth.unwritableReason = describe(error);
+    return;
+  }
+
+  // Best-effort cleanup. A sentinel left behind is harmless, and failing the
+  // probe over it would report a healthy mirror as broken.
+  await s3.provider
+    .deleteObject({ objectKey: probeKey })
+    .catch(() => undefined);
 }
 
 function noteMirrorSuccess(): void {
@@ -232,11 +303,14 @@ export function runLogMirrorHealth(): RunLogMirrorHealth {
   };
 }
 
-export function createDurableRunLogStore(options: DurableRunLogStoreOptions): RunLogStore {
+export function createDurableRunLogStore(
+  options: DurableRunLogStoreOptions,
+): RunLogStore {
   const { basePath } = options;
   const s3 = options.s3;
   const s3Prefix = normalizeKeyPrefix(s3?.keyPrefix);
-  const inflightMirrorMs = s3?.inflightMirrorMs && s3.inflightMirrorMs > 0 ? s3.inflightMirrorMs : 0;
+  const inflightMirrorMs =
+    s3?.inflightMirrorMs && s3.inflightMirrorMs > 0 ? s3.inflightMirrorMs : 0;
   mirrorHealth.configured = Boolean(s3);
 
   function s3Key(logRef: string): string {
@@ -257,7 +331,10 @@ export function createDurableRunLogStore(options: DurableRunLogStoreOptions): Ru
   }
   const inflightMirrors = new Map<string, InflightMirrorEntry>();
 
-  function mirrorInflightNow(logRef: string, entry: InflightMirrorEntry): Promise<boolean> {
+  function mirrorInflightNow(
+    logRef: string,
+    entry: InflightMirrorEntry,
+  ): Promise<boolean> {
     entry.dirty = false;
     const upload = (async () => {
       const absPath = resolveWithin(basePath, logRef);
@@ -275,32 +352,40 @@ export function createDurableRunLogStore(options: DurableRunLogStoreOptions): Ru
       });
       noteMirrorSuccess();
       return true;
-    })().catch((err) => {
-      // Best-effort like the finalize mirror: a failing upload must never
-      // break the run, but a persistently broken mirror should be visible.
-      noteMirrorFailure(err);
-      console.warn(
-        `[run-log-store] Failed to mirror in-flight run log to object storage (key: ${s3Key(logRef)}):`,
-        err,
-      );
-      // Re-dirty so the tail retries next interval even without new appends;
-      // the lastMirrorAt stamp below bounds retries to one per interval.
-      entry.dirty = true;
-      return false;
-    }).finally(() => {
-      // Stamp AFTER the attempt so a slow or failing endpoint self-throttles
-      // to one attempt per interval instead of hot-looping.
-      entry.lastMirrorAt = Date.now();
-      entry.upload = null;
-      if (entry.dirty) scheduleInflightMirror(logRef, entry);
-    });
+    })()
+      .catch((err) => {
+        // Best-effort like the finalize mirror: a failing upload must never
+        // break the run, but a persistently broken mirror should be visible.
+        noteMirrorFailure(err);
+        console.warn(
+          `[run-log-store] Failed to mirror in-flight run log to object storage (key: ${s3Key(logRef)}):`,
+          err,
+        );
+        // Re-dirty so the tail retries next interval even without new appends;
+        // the lastMirrorAt stamp below bounds retries to one per interval.
+        entry.dirty = true;
+        return false;
+      })
+      .finally(() => {
+        // Stamp AFTER the attempt so a slow or failing endpoint self-throttles
+        // to one attempt per interval instead of hot-looping.
+        entry.lastMirrorAt = Date.now();
+        entry.upload = null;
+        if (entry.dirty) scheduleInflightMirror(logRef, entry);
+      });
     entry.upload = upload;
     return upload;
   }
 
-  function scheduleInflightMirror(logRef: string, entry: InflightMirrorEntry): void {
+  function scheduleInflightMirror(
+    logRef: string,
+    entry: InflightMirrorEntry,
+  ): void {
     if (entry.timer || entry.upload) return;
-    const delay = Math.max(0, inflightMirrorMs - (Date.now() - entry.lastMirrorAt));
+    const delay = Math.max(
+      0,
+      inflightMirrorMs - (Date.now() - entry.lastMirrorAt),
+    );
     entry.timer = setTimeout(() => {
       entry.timer = null;
       void mirrorInflightNow(logRef, entry);
@@ -316,7 +401,12 @@ export function createDurableRunLogStore(options: DurableRunLogStoreOptions): Ru
       // First mirror lands one full interval after the first append: a run
       // that finalizes sooner is covered by the finalize upload, and this
       // keeps the steady-state cost at one PUT per interval per active run.
-      entry = { dirty: false, lastMirrorAt: Date.now(), timer: null, upload: null };
+      entry = {
+        dirty: false,
+        lastMirrorAt: Date.now(),
+        timer: null,
+        upload: null,
+      };
       inflightMirrors.set(logRef, entry);
     }
     entry.dirty = true;
@@ -349,14 +439,19 @@ export function createDurableRunLogStore(options: DurableRunLogStoreOptions): Ru
     const stat = await fs.stat(filePath).catch(() => null);
     if (!stat) return null;
     const start = Math.max(0, Math.min(offset, stat.size));
-    const end = Math.max(start, Math.min(start + limitBytes - 1, stat.size - 1));
+    const end = Math.max(
+      start,
+      Math.min(start + limitBytes - 1, stat.size - 1),
+    );
     if (start > end) return { content: "", nextOffset: start };
 
     const chunks: Buffer[] = [];
     try {
       await new Promise<void>((resolve, reject) => {
         const stream = createReadStream(filePath, { start, end });
-        stream.on("data", (chunk) => chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)));
+        stream.on("data", (chunk) =>
+          chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)),
+        );
         stream.on("error", reject);
         stream.on("end", () => resolve());
       });
@@ -384,12 +479,18 @@ export function createDurableRunLogStore(options: DurableRunLogStoreOptions): Ru
     const total = head.contentLength ?? 0;
     const start = Math.max(0, Math.min(offset, total));
     const end = Math.max(start, Math.min(start + limitBytes - 1, total - 1));
-    if (start > end || total === 0) return { content: "", nextOffset: start < total ? start : undefined };
+    if (start > end || total === 0)
+      return { content: "", nextOffset: start < total ? start : undefined };
 
-    const result = await s3.provider.getObject({ objectKey: key, range: { start, end } });
+    const result = await s3.provider.getObject({
+      objectKey: key,
+      range: { start, end },
+    });
     const chunks: Buffer[] = [];
     await new Promise<void>((resolve, reject) => {
-      result.stream.on("data", (chunk) => chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)));
+      result.stream.on("data", (chunk) =>
+        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)),
+      );
       result.stream.on("error", reject);
       result.stream.on("end", () => resolve());
     });
@@ -431,7 +532,9 @@ export function createDurableRunLogStore(options: DurableRunLogStoreOptions): Ru
         // Monotonic per-run sequence so readers can dedupe and order records
         // even when several identical chunks share the same millisecond ts
         // (common for ACP-style token deltas).
-        ...(typeof event.seq === "number" && Number.isFinite(event.seq) ? { seq: event.seq } : {}),
+        ...(typeof event.seq === "number" && Number.isFinite(event.seq)
+          ? { seq: event.seq }
+          : {}),
       });
       const persisted = `${line}\n`;
       await fs.appendFile(absPath, persisted, "utf8");
@@ -519,7 +622,11 @@ export function createDurableRunLogStore(options: DurableRunLogStoreOptions): Ru
           }
         }
       };
-      await Promise.all([...inflightMirrors].map(([logRef, entry]) => flushEntry(logRef, entry)));
+      await Promise.all(
+        [...inflightMirrors].map(([logRef, entry]) =>
+          flushEntry(logRef, entry),
+        ),
+      );
     },
   };
 }
@@ -544,12 +651,16 @@ function resolveRunLogS3(): DurableRunLogStoreOptions["s3"] {
   // Opt-in in-flight tail mirroring: at most one partial upload per interval
   // per active run, so a crash loses at most one interval's tail. Unset/0
   // keeps the historical finalize-only mirroring.
-  const inflightSeconds = Number.parseFloat(process.env.RUN_LOG_S3_INFLIGHT_MIRROR_SECONDS ?? "");
+  const inflightSeconds = Number.parseFloat(
+    process.env.RUN_LOG_S3_INFLIGHT_MIRROR_SECONDS ?? "",
+  );
   return {
     provider,
     keyPrefix: process.env.RUN_LOG_S3_PREFIX?.trim() || "run-logs",
     inflightMirrorMs:
-      Number.isFinite(inflightSeconds) && inflightSeconds > 0 ? Math.round(inflightSeconds * 1000) : undefined,
+      Number.isFinite(inflightSeconds) && inflightSeconds > 0
+        ? Math.round(inflightSeconds * 1000)
+        : undefined,
   };
 }
 
@@ -557,7 +668,9 @@ let cachedStore: RunLogStore | null = null;
 
 export function getRunLogStore() {
   if (cachedStore) return cachedStore;
-  const basePath = process.env.RUN_LOG_BASE_PATH ?? path.resolve(resolvePaperclipInstanceRoot(), "data", "run-logs");
+  const basePath =
+    process.env.RUN_LOG_BASE_PATH ??
+    path.resolve(resolvePaperclipInstanceRoot(), "data", "run-logs");
   cachedStore = createDurableRunLogStore({ basePath, s3: resolveRunLogS3() });
   return cachedStore;
 }
