@@ -240,6 +240,34 @@ const NATIVE_PROVIDER_HOST_ENV_KEYS = [
   "XDG_DATA_HOME",
   "SystemRoot",
   "PATHEXT",
+  // AWS credential discovery for the native providers that call AWS directly.
+  //
+  // The AgentCore provider assumes its invocation role (aws_agentcore_provider.rs)
+  // and therefore needs base credentials to assume it from. Without these keys the
+  // provider's first AWS call fails with `CredentialsNotLoaded` — surfaced as the
+  // opaque "AgentCore context S3 upload failed", because AssumeRoleProvider is lazy
+  // and only resolves on first use.
+  //
+  // The container variables matter most: on ECS the SDK reads
+  // AWS_CONTAINER_CREDENTIALS_RELATIVE_URI to reach the task-role endpoint, so
+  // omitting it breaks Foundation Cloud in production exactly as it breaks a
+  // developer machine. The static keys are listed for local runs and for hosts
+  // that inject credentials directly; the runner is a first-party binary the
+  // server just launched, and it can already read this host's filesystem.
+  "AWS_REGION",
+  "AWS_DEFAULT_REGION",
+  "AWS_CONTAINER_CREDENTIALS_RELATIVE_URI",
+  "AWS_CONTAINER_CREDENTIALS_FULL_URI",
+  "AWS_CONTAINER_AUTHORIZATION_TOKEN",
+  "AWS_WEB_IDENTITY_TOKEN_FILE",
+  "AWS_ROLE_ARN",
+  "AWS_ROLE_SESSION_NAME",
+  "AWS_ACCESS_KEY_ID",
+  "AWS_SECRET_ACCESS_KEY",
+  "AWS_SESSION_TOKEN",
+  "AWS_PROFILE",
+  "AWS_CONFIG_FILE",
+  "AWS_SHARED_CREDENTIALS_FILE",
 ] as const;
 
 async function measureNativeRunnerSpan<T>(
