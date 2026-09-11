@@ -126,6 +126,39 @@ Conviene abrir el caso ya y no esperar a tener clientes.
    que el caso debe abrirse **desde la consola**, categoría *Account and
    Billing* (esa sí está disponible en Basic).
 
+### AWS dijo textualmente que la cuenta está en verificación
+
+Probando en regiones que no habíamos tocado, `us-east-2` devolvió esto:
+
+```
+AccessDeniedException: Your account is currently being verified. Verification
+normally takes less than 2 hours. Until your account is verified, you may not
+have access to this operation. If you are still receiving this message after
+more than 2 hours, please let us know by writing to aws-verification@amazon.com.
+We appreciate your patience.
+```
+
+**Honestidad sobre esta evidencia:** salió una vez. Repitiendo la misma llamada,
+esa región pasa a devolver un error distinto (`Model access is denied ... AWS
+Marketplace actions`), que es sobre los permisos de *mi* usuario CLI, no sobre
+la cuenta. Los mensajes varían según si la región ya tiene acuerdo para el
+modelo:
+
+| Situación | Lo que responde Bedrock |
+|---|---|
+| Región con acuerdo (`us-east-1`, `mx-central-1`) | `ThrottlingException` — cuota 0 |
+| Región sin acuerdo | error de Marketplace, y una vez el de verificación |
+
+Aun así encaja con todo lo demás: cuenta de 40 horas, cuotas en 0 por debajo del
+default de AWS, y todos los proveedores estrangulados. Y da una acción concreta
+que las otras no daban.
+
+**Haz esto primero, cuesta un minuto:** escribe a **aws-verification@amazon.com**
+desde el correo de la cuenta, diciendo que la cuenta `523859314550` lleva más de
+40 horas y sigue sin acceso a Bedrock. El propio mensaje de AWS dice que ese es
+el canal cuando pasan más de 2 horas. Si eso lo resuelve, el caso de soporte de
+abajo sobra.
+
 ### Texto del caso para AWS (listo para pegar)
 
 > **Asunto:** Bedrock on-demand inference quotas are set to 0 account-wide
