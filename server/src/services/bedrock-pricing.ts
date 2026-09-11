@@ -26,7 +26,22 @@ const BEDROCK_USD_PER_MILLION: Record<
   string,
   { input: number; output: number; cacheRead: number; cacheWrite: number }
 > = {
-  // Verified 2026-09-11 against ListFoundationModelAgreementOffers (us-east-1).
+  // Verified 2026-09-11 against ListFoundationModelAgreementOffers (us-east-1),
+  // dimensions AFS1_*_Global, and re-checked the same night.
+  //
+  // The rate card also carries a SECOND, higher cache-write dimension for the
+  // one-hour TTL, which this table does not model:
+  //
+  //   model          CacheWriteInputTokenCount   CacheWrite1hInputTokenCount
+  //   sonnet-4-6     3.75                        6
+  //   opus-4-6       6.25                        10
+  //   haiku-4-5      1.25                        2
+  //
+  // It matters for whoever prices cache writes exactly: runner-core sums
+  // `ephemeral_1h_input_tokens` and `ephemeral_5m_input_tokens` into a single
+  // `cacheWriteTokens`, so the two buckets would have to be kept apart before
+  // either rate could be applied. Today both fold into input at the base rate,
+  // which understates rather than overstates.
   "claude-sonnet-4-6": { input: 3, output: 15, cacheRead: 0.3, cacheWrite: 3.75 },
   "claude-sonnet-4-5": { input: 3, output: 15, cacheRead: 0.3, cacheWrite: 3.75 },
   "claude-opus-4-6": { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 },
