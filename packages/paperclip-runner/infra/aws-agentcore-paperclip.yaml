@@ -541,4 +541,14 @@ Outputs:
   ContextKmsKeyArn:
     Value: !GetAtt ContextEncryptionKey.Arn
   QualificationRevision:
-    Value: aws-agentcore-harness-context-v2
+    # Must match AGENTCORE_QUALIFICATION_SUITE in the server and the runner,
+    # which both pin `aws-agentcore-harness-v1`. This output is copied verbatim
+    # into a company's remote-agent profile, and remote-agent-profiles rejects
+    # any other value — so the previous `aws-agentcore-harness-context-v2` made
+    # every profile created from this stack unprocessable.
+    #
+    # It was never a later revision of a v1 suite: the string appears nowhere
+    # else in the repository, while `aws-agentcore-harness-v1` appears in the
+    # server, the Rust provider and their tests. The template simply shipped
+    # with a name no code ever recognized.
+    Value: aws-agentcore-harness-v1
