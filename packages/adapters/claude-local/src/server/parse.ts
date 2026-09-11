@@ -109,7 +109,15 @@ export function parseClaudeStreamJson(stdout: string) {
   const modelUsageTotals = claudeModelUsageTotals(finalResult.modelUsage);
   const usageObj = parseObject(finalResult.usage);
   const usage: UsageSummary = modelUsageTotals ?? {
-    inputTokens: asNumber(usageObj.input_tokens, 0),
+    // Cache creation counts as input here for the same reason it does in
+    // claudeModelUsageTotals: Anthropic bills those as prompt tokens. Reading
+    // only `input_tokens` on this path dropped them, so a run that fell back to
+    // the top-level usage (no modelUsage in the result event) was ledgered
+    // below what the run actually cost -- which under Bedrock is Foundation
+    // paying Amazon for tokens no tenant is charged for.
+    inputTokens:
+      asNumber(usageObj.input_tokens, 0)
+      + asNumber(usageObj.cache_creation_input_tokens, 0),
     cachedInputTokens: asNumber(usageObj.cache_read_input_tokens, 0),
     outputTokens: asNumber(usageObj.output_tokens, 0),
   };

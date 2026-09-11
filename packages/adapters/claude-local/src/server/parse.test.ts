@@ -566,4 +566,27 @@ describe("parseClaudeStreamJson usage extraction", () => {
     });
     expect(parsed.usageBasis).toBe("per_run");
   });
+
+  it("counts cache creation as input on the fallback path too", () => {
+    // Anthropic bills cache writes as prompt tokens, which is why
+    // claudeModelUsageTotals folds them into input. This path used to read only
+    // input_tokens, so a run without modelUsage was ledgered short by exactly
+    // the cache it built -- Foundation paying Amazon for tokens no tenant was
+    // charged for.
+    const parsed = parseClaudeStreamJson(
+      `${resultEvent({
+        usage: {
+          input_tokens: 10,
+          output_tokens: 1_800,
+          cache_read_input_tokens: 20,
+          cache_creation_input_tokens: 5_000,
+        },
+      })}\n`,
+    );
+    expect(parsed.usage).toEqual({
+      inputTokens: 5_010,
+      outputTokens: 1_800,
+      cachedInputTokens: 20,
+    });
+  });
 });
