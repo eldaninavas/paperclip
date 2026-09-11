@@ -712,10 +712,31 @@ Concretamente, hoy:
   directorio de trabajo de otro tenant dentro del mismo contenedor.
 
 Esto es aceptable mientras el único usuario seas tú. **No lo es en cuanto entre
-el primer cliente real.** Cerrarlo requiere elegir y contratar un sandbox
-provider (cloudflare, daytona, e2b, kubernetes, modal, novita), que es la
-decisión de costo pendiente, y poner `enableManagedSandboxOnly` para que ningún
+el primer cliente real.**
+
+**Mitigación disponible hoy, sin costo y sin proveedor externo:** el ajuste
+experimental **`enableIsolatedWorkspaces`** hace que cada ejecución use un
+workspace nuevo y aislado (`isolated_workspace`) en lugar del compartido del
+proyecto (`shared_workspace`). Está apagado por defecto
+(`instance-settings.ts:264`).
+
+Qué resuelve y qué no, para no venderlo de más:
+
+| | Con `enableIsolatedWorkspaces` |
+|---|---|
+| Directorio de trabajo por run | ✅ aislado |
+| Output y ledger por tenant | ✅ ya lo estaban |
+| Proceso, memoria y red | ❌ **siguen compartidos** en la misma task de ECS |
+| Un agente con shell leyendo el FS del contenedor | ❌ sigue siendo posible |
+
+Es decir: reduce mucho la superficie accidental (que un agente tropiece con el
+workspace de otro), pero **no es una frontera de seguridad**. Para eso sigue
+haciendo falta elegir y contratar un sandbox provider (cloudflare, daytona, e2b,
+kubernetes, modal, novita) y activar `enableManagedSandboxOnly` para que ningún
 run caiga al driver `local`.
+
+**Recomendación:** activar `enableIsolatedWorkspaces` ya (es gratis y mejora el
+estado actual), y no confundirlo con haber resuelto el aislamiento multitenant.
 
 ### Detalle a vigilar: catálogo de modelos vs. región
 
