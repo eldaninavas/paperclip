@@ -4,6 +4,7 @@ import path from "node:path";
 import { Readable } from "node:stream";
 import { afterEach, describe, expect, it } from "vitest";
 import {
+  beginRunLogMirrorProbe,
   createDurableRunLogStore,
   runLogMirrorHealth,
 } from "../services/run-log-store.ts";
@@ -115,6 +116,19 @@ describe("run log mirror health", () => {
       process.env.RUN_LOG_S3_BUCKET = "paperclip-run-logs";
       expect(runLogMirrorHealth().configured).toBe(true);
       expect(bare.uploads).toBe(runLogMirrorHealth().uploads);
+    } finally {
+      if (previous === undefined) delete process.env.RUN_LOG_S3_BUCKET;
+      else process.env.RUN_LOG_S3_BUCKET = previous;
+    }
+  });
+
+  it("does not probe object storage when none is configured", () => {
+    const previous = process.env.RUN_LOG_S3_BUCKET;
+    try {
+      delete process.env.RUN_LOG_S3_BUCKET;
+      beginRunLogMirrorProbe();
+      // No bucket, no probe, and no claim either way about reachability.
+      expect(runLogMirrorHealth().reachable).toBeNull();
     } finally {
       if (previous === undefined) delete process.env.RUN_LOG_S3_BUCKET;
       else process.env.RUN_LOG_S3_BUCKET = previous;

@@ -135,6 +135,18 @@ export interface DurableRunLogStoreOptions {
  */
 export interface RunLogMirrorHealth {
   configured: boolean;
+  /**
+   * Whether object storage answered a probe from this process. `null` until
+   * the probe finishes.
+   *
+   * Counters only move once agents have run, so a deployment that has never
+   * executed anything reports a perfectly healthy mirror whether or not its
+   * credentials work. This is the difference: one HEAD on a key that does not
+   * exist, which exercises the whole chain -- container credentials, network,
+   * and the bucket policy -- and comes back 404 when it is all in place.
+   */
+  reachable: boolean | null;
+  unreachableReason: string | null;
   uploads: number;
   failures: number;
   consecutiveFailures: number;
@@ -144,12 +156,48 @@ export interface RunLogMirrorHealth {
 
 const mirrorHealth: RunLogMirrorHealth = {
   configured: false,
+  reachable: null,
+  unreachableReason: null,
   uploads: 0,
   failures: 0,
   consecutiveFailures: 0,
   lastFailureAt: null,
   lastFailureReason: null,
 };
+
+let mirrorProbe: Promise<void> | null = null;
+
+/**
+ * Ask object storage once, in the background, whether this process can reach
+ * it. Returns immediately; the answer lands in `runLogMirrorHealth`.
+ *
+ * At most one probe per process: the question is about configuration, which
+ * does not change while the process lives, and health endpoints are called
+ * often enough that anything per-request would be wasteful.
+ */
+export function beginRunLogMirrorProbe(): void {
+  if (mirrorProbe !== null) return;
+  const s3 = resolveRunLogS3();
+  if (!s3) return;
+  const prefix = normalizeKeyPrefix(s3.keyPrefix);
+  // A key that should never exist. HeadObject answers 404 when credentials and
+  // the bucket policy are in place, and throws otherwise.
+  const probeKey = prefix
+    ? `${prefix}/.foundation-mirror-probe`
+    : ".foundation-mirror-probe";
+  mirrorProbe = s3.provider
+    .headObject({ objectKey: probeKey })
+    .then(() => {
+      mirrorHealth.reachable = true;
+      mirrorHealth.unreachableReason = null;
+    })
+    .catch((error: unknown) => {
+      mirrorHealth.reachable = false;
+      const name = error instanceof Error ? error.name : "Error";
+      const message = error instanceof Error ? error.message : String(error);
+      mirrorHealth.unreachableReason = `${name}: ${message}`.slice(0, 200);
+    });
+}
 
 function noteMirrorSuccess(): void {
   mirrorHealth.uploads += 1;

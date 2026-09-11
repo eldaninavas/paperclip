@@ -15,7 +15,10 @@ import {
 import { getCloudRuntimeIdentity } from "../services/cloud-runtime-identity.js";
 import { getHiddenSettings } from "../services/settings-visibility.js";
 import { describeBedrockBillingReadiness } from "../services/bedrock-pricing.js";
-import { runLogMirrorHealth } from "../services/run-log-store.js";
+import {
+  beginRunLogMirrorProbe,
+  runLogMirrorHealth,
+} from "../services/run-log-store.js";
 import {
   inspectDatabaseBackupHealth,
   type DatabaseBackupHealthStatus,
@@ -186,6 +189,10 @@ export function healthRoutes(
     // credentials or a denied bucket policy is otherwise silent until a task
     // roll takes the local copies with it. Counts only: object keys carry
     // tenant and run ids.
+    // Kicks off at most one HEAD against the bucket for the life of the
+    // process. Counters alone cannot tell a healthy mirror from a broken one
+    // before any agent has run, and on this deployment nothing has.
+    beginRunLogMirrorProbe();
     const runLogMirror = runLogMirrorHealth();
     // serverInfo (git SHA + process start) rides on the full-details responses
     // only, so it reaches board/agent actors in authenticated mode or any caller
@@ -345,6 +352,7 @@ export function healthRoutes(
                 ...(runLogMirror.configured
                   ? {
                       runLogMirror: {
+                        reachable: runLogMirror.reachable,
                         consecutiveFailures: runLogMirror.consecutiveFailures,
                       },
                     }
