@@ -240,34 +240,29 @@ const NATIVE_PROVIDER_HOST_ENV_KEYS = [
   "XDG_DATA_HOME",
   "SystemRoot",
   "PATHEXT",
-  // AWS credential discovery for the native providers that call AWS directly.
+  // Role-based AWS credential discovery, for native providers that call AWS.
   //
-  // The AgentCore provider assumes its invocation role (aws_agentcore_provider.rs)
-  // and therefore needs base credentials to assume it from. Without these keys the
-  // provider's first AWS call fails with `CredentialsNotLoaded` — surfaced as the
-  // opaque "AgentCore context S3 upload failed", because AssumeRoleProvider is lazy
-  // and only resolves on first use.
+  // The AgentCore provider assumes its invocation role, so it needs a base
+  // identity to assume it from. On ECS that identity is the task role, reached
+  // through AWS_CONTAINER_CREDENTIALS_RELATIVE_URI — an environment variable ECS
+  // injects. This list gates what the server hands the runner, so dropping that
+  // variable left the provider with no credentials at all: its first AWS call
+  // failed with `CredentialsNotLoaded`, surfaced as the opaque "AgentCore context
+  // S3 upload failed" because AssumeRoleProvider resolves lazily on first use.
   //
-  // The container variables matter most: on ECS the SDK reads
-  // AWS_CONTAINER_CREDENTIALS_RELATIVE_URI to reach the task-role endpoint, so
-  // omitting it breaks Foundation Cloud in production exactly as it breaks a
-  // developer machine. The static keys are listed for local runs and for hosts
-  // that inject credentials directly; the runner is a first-party binary the
-  // server just launched, and it can already read this host's filesystem.
+  // Only role- and container-based keys are listed, matching
+  // `runnerExplicitProviderEnvironmentKeys` in durable-prp-control-plane.ts,
+  // which deliberately refuses to pass long-lived AWS_ACCESS_KEY_ID /
+  // AWS_SECRET_ACCESS_KEY across the runner boundary. Adding them here would
+  // only look like it worked: the control plane filters them out again.
   "AWS_REGION",
   "AWS_DEFAULT_REGION",
   "AWS_CONTAINER_CREDENTIALS_RELATIVE_URI",
   "AWS_CONTAINER_CREDENTIALS_FULL_URI",
-  "AWS_CONTAINER_AUTHORIZATION_TOKEN",
+  "AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE",
   "AWS_WEB_IDENTITY_TOKEN_FILE",
   "AWS_ROLE_ARN",
   "AWS_ROLE_SESSION_NAME",
-  "AWS_ACCESS_KEY_ID",
-  "AWS_SECRET_ACCESS_KEY",
-  "AWS_SESSION_TOKEN",
-  "AWS_PROFILE",
-  "AWS_CONFIG_FILE",
-  "AWS_SHARED_CREDENTIALS_FILE",
 ] as const;
 
 async function measureNativeRunnerSpan<T>(
