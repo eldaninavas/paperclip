@@ -153,7 +153,11 @@ import {
   type NativeSessionBackend,
 } from "../vendor/paperclip-runner/index.js";
 import { normalizeResponsibleUserDenialCode } from "./responsible-user-denial-run-outcomes.js";
-import { getRunLogStore, type RunLogHandle } from "./run-log-store.js";
+import {
+  getRunLogStore,
+  runLogRefBelongsToCompany,
+  type RunLogHandle,
+} from "./run-log-store.js";
 import {
   providerTraceStore,
   PROVIDER_TRACE_MAX_BYTES,
@@ -25610,6 +25614,13 @@ export function heartbeatService(
         typeof runOrLookup === "string" ? runOrLookup : runOrLookup.id;
       if (!run) throw notFound("Heartbeat run not found");
       if (!run.logStore || !run.logRef) throw notFound("Run log not found");
+      // The caller was already authorized for run.companyId; this checks that
+      // the key it is about to read is that company's. Reported as missing
+      // rather than forbidden, so a probe cannot use the distinction to learn
+      // that another tenant's log exists.
+      if (!runLogRefBelongsToCompany(run.logRef, run.companyId)) {
+        throw notFound("Run log not found");
+      }
 
       const result = await runLogStore.read(
         {

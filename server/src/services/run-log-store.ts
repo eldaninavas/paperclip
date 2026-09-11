@@ -47,6 +47,32 @@ function safeSegments(...segments: string[]) {
   return segments.map((segment) => segment.replace(/[^a-zA-Z0-9._-]/g, "_"));
 }
 
+/**
+ * Whether a stored log reference belongs to the tenant asking for it.
+ *
+ * `begin` writes every reference as `<companyId>/<agentId>/<runId>.ndjson`, so
+ * the tenant is part of the object key in both the local tree and the S3
+ * mirror. Reads, though, take the reference straight from the run row and hand
+ * it to S3 without looking at it, which makes a single mis-set `log_ref` enough
+ * to serve one tenant another tenant's transcript through an endpoint that
+ * already passed its own authorization check. Foundation Cloud sells tenant
+ * isolation, so the key is checked against the run's own company rather than
+ * trusted because it came out of the database.
+ *
+ * References written before the tenant segment existed have no separator and
+ * are left alone: they are single-tenant by construction, and failing them
+ * closed would only hide old logs without isolating anything.
+ */
+export function runLogRefBelongsToCompany(
+  logRef: string,
+  companyId: string,
+): boolean {
+  const normalized = logRef.replaceAll("\\", "/");
+  const separator = normalized.indexOf("/");
+  if (separator === -1) return true;
+  return normalized.slice(0, separator) === safeSegments(companyId)[0];
+}
+
 function resolveWithin(basePath: string, relativePath: string) {
   const resolved = path.resolve(basePath, relativePath);
   const base = path.resolve(basePath) + path.sep;
