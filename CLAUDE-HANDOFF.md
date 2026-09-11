@@ -157,29 +157,34 @@ habilite al menos una de las dos vías. Conviene abrir el caso de soporte antes 
 seguir invirtiendo ingeniería en esta arquitectura, y considerar un plan B
 (p. ej. API de Anthropic directa con la clave del propio cliente) si AWS tarda.
 
-## Arquitectura de Foundation Cloud — CORREGIDO de madrugada
+## Arquitectura de Foundation Cloud
 
-> **Lee esto antes que nada: la recomendación cambió a mitad de sesión, con
-> evidencia.** Primero concluí que el camino era `claude_local` + Bedrock
-> directo. Es más simple, pero **hoy no funciona en esta cuenta**, y AgentCore
-> sí.
+> **Corrección (sesión nocturna).** Una versión anterior de esta sección decía
+> que AgentCore *sí* ejecutaba modelos y que `claude_local` + Bedrock estaba
+> bloqueado, basándose en que `model_call_count` subía a 2 en una sesión nueva.
+> **Esa lectura era falsa y hay que descartarla.** `model_call_count` cuenta los
+> intentos del harness, no las respuestas: el harness llamaba a Bedrock, Bedrock
+> estrangulaba cada intento, se agotaban las iteraciones y devolvía
+> `max_iterations_exceeded` sin una sola línea de contenido. Por eso un harness
+> mínimo de control se comportaba igual que el nuestro.
+>
+> Ninguna de las dos vías ejecuta un modelo hoy, y la causa es la misma: la
+> cuota de Bedrock de la cuenta está en 0 para todos los proveedores. Ver
+> *Causa raíz única* arriba.
 
-**Medido a las 04:00, con dos minutos de diferencia:**
+**Medido de nuevo, 2026-09-11 por la noche:**
 
 | Vía | Resultado |
 |---|---|
-| `claude_local` + Bedrock directo (`InvokeModel`) | **429** — "Too many tokens per day" |
-| AgentCore `InvokeHarness` | **funciona** — `model_call_count = 2` en sesión nueva |
+| `claude_local` + Bedrock directo (`InvokeModel`) | `ThrottlingException` — "Too many tokens per day" |
+| `Converse` sobre OpenAI, Qwen, Nova, DeepSeek, Mistral | idéntico, en tres regiones |
+| AgentCore `InvokeHarness` | `messageStop / max_iterations_exceeded`, sin contenido — el mismo estrangulamiento, un nivel más abajo |
 
-AgentCore Runtime no consume la cuota de inferencia on-demand de la cuenta
-(`L-248E47B7`, que está en 0 y no es ajustable). Es decir: **el camino que
-descarté por complejo es el único que ejecuta modelos hoy**, y el que recomendé
-por simple está bloqueado hasta que AWS habilite la cuenta.
-
-**Conclusión:** AgentCore deja de ser laboratorio y pasa a ser el camino
-viable a corto plazo. `claude_local` + Bedrock queda como el destino cuando AWS
-otorgue cuota — el código de precios y de run logs sirve para ambos, porque vive
-en el ledger y en el store, no en el adapter.
+**Conclusión:** elegir entre las dos vías es una decisión que todavía no toca.
+Cuando AWS restaure la cuota, la más simple (`claude_local` + Bedrock directo)
+es la que hay que probar primero: menos piezas, sin harness, sin Memory, y ya
+tiene el rol de la task con permiso de invocación. El precio y los run logs
+sirven para las dos porque viven en el ledger y en el store, no en el adapter.
 
 ### Lo que falta para usar AgentCore como producción
 
