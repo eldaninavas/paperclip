@@ -221,7 +221,33 @@ Nota: la invocación de AgentCore en us-east-1 sí llegó al modelo antes
 (`model_call_count: 4`), probablemente consumiendo el margen inicial. Después de
 eso, todo devuelve 429.
 
-### BLOQUEO #2 — un solo comando, requiere al fundador
+### BLOQUEO #2 — probablemente YA NO hace falta (verificar en dev)
+
+**Actualización de madrugada.** El runner no necesita permisos de Bedrock
+propios: **asume el rol de invocación** (`aws_agentcore_provider.rs:643`), y ese
+rol ya lleva Bedrock, S3 y KMS. Lo único que le faltaba al contenedor era estar
+en la *trust policy* de ese rol — que, igual que una bucket policy, concede desde
+el lado del recurso y no requiere política de identidad.
+
+Hecho: el template acepta ahora un segundo principal y el stack de desarrollo
+confía en `foundation-dev-ecs-task`. Change set de un recurso, sin reemplazo,
+`UPDATE_COMPLETE`. La trust policy es hoy:
+
+```
+["arn:aws:iam::523859314550:user/foundation-cli",
+ "arn:aws:iam::523859314550:role/foundation-dev-ecs-task"]
+```
+
+**Con esto, la ruta AgentCore no debería necesitar la política de identidad.**
+Cuidado con la certeza: `simulate-principal-policy` devuelve `implicitDeny` para
+`sts:AssumeRole`, pero el simulador no modela bien una trust policy como política
+de recurso, así que ese resultado no es concluyente. **La verificación real es
+ejecutar un agente en dev.**
+
+**Si al probar falla con un error de credenciales o de AssumeRole**, entonces sí
+hace falta la política de abajo; aplícala y vuelve a probar.
+
+### BLOQUEO #2 (plan B, sólo si lo anterior falla) — un comando
 
 **S3 ya está resuelto**: los buckets llevan una *bucket policy* que concede
 directamente a `foundation-dev-ecs-task` y `foundation-prod-ecs-task`. Dentro de
