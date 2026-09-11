@@ -36,9 +36,46 @@
 - El AWS CLI local (2.28.4) **no** tiene las operaciones de AgentCore Harness. Usar el contenedor oficial:
   `docker run --rm -v "$HOME/.aws:/root/.aws:ro" -e AWS_PROFILE=foundation public.ecr.aws/aws-cli/aws-cli:latest <args>`
 
-## Arquitectura de Foundation Cloud (decidida esta sesión)
+## Arquitectura de Foundation Cloud — CORREGIDO de madrugada
 
-**El camino de producción NO es AgentCore, es `claude_local` + Bedrock.**
+> **Lee esto antes que nada: la recomendación cambió a mitad de sesión, con
+> evidencia.** Primero concluí que el camino era `claude_local` + Bedrock
+> directo. Es más simple, pero **hoy no funciona en esta cuenta**, y AgentCore
+> sí.
+
+**Medido a las 04:00, con dos minutos de diferencia:**
+
+| Vía | Resultado |
+|---|---|
+| `claude_local` + Bedrock directo (`InvokeModel`) | **429** — "Too many tokens per day" |
+| AgentCore `InvokeHarness` | **funciona** — `model_call_count = 2` en sesión nueva |
+
+AgentCore Runtime no consume la cuota de inferencia on-demand de la cuenta
+(`L-248E47B7`, que está en 0 y no es ajustable). Es decir: **el camino que
+descarté por complejo es el único que ejecuta modelos hoy**, y el que recomendé
+por simple está bloqueado hasta que AWS habilite la cuenta.
+
+**Conclusión:** AgentCore deja de ser laboratorio y pasa a ser el camino
+viable a corto plazo. `claude_local` + Bedrock queda como el destino cuando AWS
+otorgue cuota — el código de precios y de run logs sirve para ambos, porque vive
+en el ledger y en el store, no en el adapter.
+
+### Lo que falta para usar AgentCore como producción
+
+1. **`qualificationRevision`**: el stack emite `aws-agentcore-harness-context-v2`
+   y todo el código (server TS y runner Rust) exige `aws-agentcore-harness-v1`.
+   Hay que decidir cuál es la buena antes de crear perfiles; no lo toqué porque
+   falsear la atestación sería peor que el bloqueo.
+2. **El adapter `paperclip_runner` está excluido del onboarding**
+   (`ONBOARDING_EXCLUDED_ADAPTER_TYPES`).
+3. **Un `remote_agent_profile` por company** apuntando al stack.
+4. **El contrato `finish`/`block`**: `max_iterations_exceeded` es lo que responde
+   el harness sin él; lo implementa `paperclip-runnerd`, ya corregido y
+   construyéndose en CI.
+
+### La arquitectura anterior (sigue siendo válida cuando haya cuota)
+
+**`claude_local` + Bedrock.**
 
 - El adapter `claude-local` ya soporta Bedrock nativamente (`CLAUDE_CODE_USE_BEDROCK`, `ANTHROPIC_MODEL`, `AWS_REGION`).
 - **Bedrock está disponible en `mx-central-1`**, la misma región del cluster: sin cross-region, sin latencia extra, y los datos del tenant no salen de México.
