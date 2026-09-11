@@ -73,9 +73,27 @@ en el ledger y en el store, no en el adapter.
 2. **El adapter `paperclip_runner` está excluido del onboarding**
    (`ONBOARDING_EXCLUDED_ADAPTER_TYPES`).
 3. **Un `remote_agent_profile` por company** apuntando al stack.
-4. **El contrato `finish`/`block`**: `max_iterations_exceeded` es lo que responde
-   el harness sin él; lo implementa `paperclip-runnerd`, ya corregido y
-   construyéndose en CI.
+4. **El último tramo exige el servidor completo.** Compilé `paperclip-runnerd`
+   (release, 28 MB) y ejecuté el smoke oficial
+   `scripts/capability-aws-agentcore-smoke.mjs` contra el stack real. Resultado:
+
+   - el runner arranca y **abre sesión PRP** correctamente;
+   - el provider de AgentCore **se inicializa** y falla con un error preciso:
+     `AgentCore requires paperclip.native-execution-input.v3 runtimeContext`.
+
+   Es decir, la integración runner↔AgentCore está bien; lo que falta es el
+   *bundle de instrucciones* (digest, rootPath, entryPath) que construye el
+   **servidor** en `agent-instructions.ts` / `heartbeat.ts` cuando ejecuta un
+   agente real. El runner aislado no puede fabricarlo, y falsearlo no probaría
+   nada.
+
+   **Conclusión: el end-to-end sólo se cierra ejecutando un agente desde la
+   aplicación.** Eso necesita el servicio arriba (ECS, que tengo con
+   `explicitDeny`) o un servidor local con BD, company, agente y perfil remoto.
+
+   De paso quedó verificado con el binario real que la corrección de
+   `defaultCapabilityRunnerdBinary()` resuelve bien:
+   `dist/bin/paperclip-runnerd` → existe.
 
 ### La arquitectura anterior (sigue siendo válida cuando haya cuota)
 
