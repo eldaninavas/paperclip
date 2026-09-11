@@ -99,7 +99,48 @@ Costo ~$1/mes (KMS). `aws-agentcore.sh destroy` lo apaga.
 - Variables de GitHub creadas en el entorno `development`: `RUN_LOG_S3_BUCKET`, `FOUNDATION_BEDROCK_MODEL`.
 - Rama `foundation-cloud-bedrock` (commit `f6ddeb2ed`), desplegada a dev por `workflow_dispatch`. **Master sin tocar.**
 
-### BLOQUEADO — un solo comando, requiere al fundador
+### BLOQUEO #1 (el que manda): Bedrock tiene cuota CERO en esta cuenta
+
+Descubierto probando Claude Code contra Bedrock con credenciales reales. La
+conexión funciona, la autenticación funciona, y la API responde:
+
+```
+api_error_status: 429
+"Too many tokens per day, please wait before trying again."
+```
+
+La causa no es el permiso. Es la cuota de la cuenta, en `mx-central-1` **y** en
+`us-east-1`:
+
+```
+Global cross-region model inference tokens per day      → 0
+Global cross-region model inference tokens per minute    → 0
+Global cross-region model inference requests per minute  → 0
+Cross-region model inference tokens per minute           → 0
+```
+
+Cuenta nueva sin historial: AWS asigna cuota cero para inferencia on-demand
+hasta que se solicita un aumento. Sólo las cuotas de *batch inference* son > 0.
+
+**Esto bloquea Foundation Cloud por completo**, con o sin permisos, con o sin
+despliegue. Ningún agente puede ejecutarse hasta que AWS apruebe cuota.
+
+**Qué hacer (sólo tú puedes; `servicequotas:RequestServiceQuotaIncrease` me está
+denegado):** en la consola → Service Quotas → Amazon Bedrock → región
+`mx-central-1`, y pedir aumento de al menos:
+
+- *Global cross-region model inference tokens per minute for Anthropic Claude Sonnet 4.6*
+- *Global cross-region model inference tokens per day for Anthropic Claude Sonnet 4.6*
+- *Global cross-region model inference requests per minute for Anthropic Claude Sonnet 4.6*
+
+La aprobación de AWS tarda de horas a días. **Es el camino crítico del
+lanzamiento**: conviene pedirlo ya, aunque el resto no esté listo.
+
+Nota: la invocación de AgentCore en us-east-1 sí llegó al modelo antes
+(`model_call_count: 4`), probablemente consumiendo el margen inicial. Después de
+eso, todo devuelve 429.
+
+### BLOQUEO #2 — un solo comando, requiere al fundador
 
 **S3 ya está resuelto**: los buckets llevan una *bucket policy* que concede
 directamente a `foundation-dev-ecs-task` y `foundation-prod-ecs-task`. Dentro de
