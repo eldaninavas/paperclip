@@ -775,11 +775,15 @@ TOTAL EVENTOS: 1
 ```
 
 **Un solo evento.** Ni `messageStart`, ni `contentBlockDelta`, ni `toolUse`, ni
-`metadata` con usage. En cambio `model_call_count` sí sube en Memory: el modelo
-se invoca de verdad y su salida no aparece en el stream.
+`metadata` con usage. En cambio `model_call_count` sí sube en Memory.
 
-Escala con las iteraciones (~8-17 s cada una), así que el harness itera, llama al
-modelo y descarta —o nunca recibe— la respuesta.
+> **Lectura corregida.** En su momento interpreté ese contador como "el modelo se
+> invoca de verdad y su salida se pierde". Es al revés: `model_call_count` cuenta
+> los **intentos** del harness. Cada intento recibe `ThrottlingException` de
+> Bedrock, el harness reintenta, agota iteraciones y cierra con
+> `max_iterations_exceeded`. Los ~8-17 s por iteración son los reintentos con
+> backoff, no una inferencia ejecutándose. No hay salida que perder porque nunca
+> hubo respuesta.
 
 **Esto ya no parece configuración nuestra.** Las cosas bajo nuestro control están
 verificadas: el modelo está habilitado y con acuerdo `AVAILABLE`, el rol de
@@ -841,8 +845,10 @@ Con el estado durable borrado y los timeouts a 300 s, el run sigue fallando con
 - El provider Rust **sí** emite `ProviderRuntimeIdentity::RemoteService`
   (`aws_agentcore_provider.rs:1450`), pero sólo **después** de una respuesta del
   harness.
-- Y el harness, sin que se satisfaga su contrato de completación, termina en
-  `max_iterations_exceeded` — exactamente lo que devolvía la invocación manual,
+- Y el harness termina en `max_iterations_exceeded` — exactamente lo que
+  devolvía la invocación manual. (Entonces lo atribuí al contrato de
+  completación; la causa real es que Bedrock estrangula cada llamada. El
+  encadenamiento del fallo sigue siendo este.)
   con y sin una función `finish` improvisada.
 
 **Por tanto el hilo correcto NO es subir timeouts** (aunque el arreglo de los
