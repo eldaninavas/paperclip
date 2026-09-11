@@ -113,3 +113,30 @@ export function resolveBedrockCostUsd(
 export function pricedBedrockModelKeys(): readonly string[] {
   return Object.keys(BEDROCK_USD_PER_MILLION);
 }
+
+/**
+ * Whether the deployment's configured model is one this build can bill for.
+ *
+ * Changing `FOUNDATION_BEDROCK_MODEL` to a family missing from the rate card
+ * does not fail anything: runs keep working, the ledger keeps recording tokens,
+ * and every row lands `unpriced` at zero cents. That is revenue leaving without
+ * an error anywhere, so the answer is surfaced on the health endpoint the
+ * deploy already reads, where a wrong model is visible on the next deploy
+ * rather than on the next invoice.
+ */
+export function describeBedrockBillingReadiness(env: {
+  CLAUDE_CODE_USE_BEDROCK?: string;
+  ANTHROPIC_MODEL?: string;
+}): { model: string | null; priced: boolean } | null {
+  const enabled = (env.CLAUDE_CODE_USE_BEDROCK ?? "").trim();
+  if (enabled === "" || enabled === "0" || enabled.toLowerCase() === "false") {
+    return null;
+  }
+  const model = (env.ANTHROPIC_MODEL ?? "").trim();
+  if (model === "") return { model: null, priced: false };
+  const key = canonicalBedrockModelKey(model);
+  return {
+    model,
+    priced: key !== null && key in BEDROCK_USD_PER_MILLION,
+  };
+}

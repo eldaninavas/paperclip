@@ -128,6 +128,46 @@ describe("GET /health", () => {
     expect(Object.prototype.hasOwnProperty.call(res.body, "cloud")).toBe(false);
   });
 
+  it("says whether the deployed Bedrock model can actually be billed", async () => {
+    const app = createApp(createHealthyDb(), testServerInfo, undefined, {
+      FOUNDATION_CLOUD_EXECUTION: "true",
+      CLAUDE_CODE_USE_BEDROCK: "1",
+      ANTHROPIC_MODEL: "global.anthropic.claude-sonnet-4-6",
+    });
+
+    const res = await request(app).get("/health");
+
+    expect(res.status).toBe(200);
+    expect(res.body.features?.foundationCloudBilling).toEqual({
+      model: "global.anthropic.claude-sonnet-4-6",
+      priced: true,
+    });
+  });
+
+  it("flags a Bedrock model that would ledger every tenant at zero", async () => {
+    // Nothing else reports this: the run succeeds, tokens are recorded, and
+    // every cost_events row lands unpriced.
+    const app = createApp(createHealthyDb(), testServerInfo, undefined, {
+      FOUNDATION_CLOUD_EXECUTION: "true",
+      CLAUDE_CODE_USE_BEDROCK: "1",
+      ANTHROPIC_MODEL: "global.anthropic.claude-opus-5",
+    });
+
+    const res = await request(app).get("/health");
+
+    expect(res.body.features?.foundationCloudBilling?.priced).toBe(false);
+  });
+
+  it("omits the billing field when the deployment is not on Bedrock", async () => {
+    const app = createApp(createHealthyDb(), testServerInfo, undefined, {
+      FOUNDATION_CLOUD_EXECUTION: "true",
+    });
+
+    const res = await request(app).get("/health");
+
+    expect(res.body.features?.foundationCloudBilling).toBeUndefined();
+  });
+
   it("lists operator-hidden settings and drops unknown keys", async () => {
     const app = createApp(undefined, testServerInfo, undefined, {
       PAPERCLIP_HIDDEN_SETTINGS: "instance.plugins,instance.adapters,instance.bogus",

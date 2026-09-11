@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   canonicalBedrockModelKey,
+  describeBedrockBillingReadiness,
   isBedrockModelId,
   pricedBedrockModelKeys,
   resolveBedrockCostUsd,
@@ -117,5 +118,42 @@ describe("resolveBedrockCostUsd", () => {
   it("exposes the priced families so a rate gap is visible", () => {
     expect(pricedBedrockModelKeys()).toContain("claude-sonnet-4-6");
     expect(pricedBedrockModelKeys().length).toBeGreaterThanOrEqual(4);
+  });
+});
+
+describe("describeBedrockBillingReadiness", () => {
+  it("says nothing when the deployment is not on Bedrock", () => {
+    expect(describeBedrockBillingReadiness({})).toBeNull();
+    expect(
+      describeBedrockBillingReadiness({ CLAUDE_CODE_USE_BEDROCK: "0" }),
+    ).toBeNull();
+    expect(
+      describeBedrockBillingReadiness({ CLAUDE_CODE_USE_BEDROCK: "false" }),
+    ).toBeNull();
+  });
+
+  it("confirms the deployed model can be billed", () => {
+    expect(
+      describeBedrockBillingReadiness({
+        CLAUDE_CODE_USE_BEDROCK: "1",
+        ANTHROPIC_MODEL: "global.anthropic.claude-sonnet-4-6",
+      }),
+    ).toEqual({ model: "global.anthropic.claude-sonnet-4-6", priced: true });
+  });
+
+  it("flags a model this build has no rate for", () => {
+    // The run would still work. Every cost_events row would be unpriced.
+    expect(
+      describeBedrockBillingReadiness({
+        CLAUDE_CODE_USE_BEDROCK: "1",
+        ANTHROPIC_MODEL: "global.anthropic.claude-opus-5",
+      }),
+    ).toEqual({ model: "global.anthropic.claude-opus-5", priced: false });
+  });
+
+  it("flags Bedrock turned on with no model configured", () => {
+    expect(
+      describeBedrockBillingReadiness({ CLAUDE_CODE_USE_BEDROCK: "1" }),
+    ).toEqual({ model: null, priced: false });
   });
 });

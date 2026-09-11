@@ -14,6 +14,7 @@ import {
 } from "../services/cloud-instance.js";
 import { getCloudRuntimeIdentity } from "../services/cloud-runtime-identity.js";
 import { getHiddenSettings } from "../services/settings-visibility.js";
+import { describeBedrockBillingReadiness } from "../services/bedrock-pricing.js";
 import {
   inspectDatabaseBackupHealth,
   type DatabaseBackupHealthStatus,
@@ -175,6 +176,11 @@ export function healthRoutes(
     // fuller-detail fetch. Omitted entirely when nothing is hidden, so
     // deployments without the env var keep today's byte-identical responses.
     const hiddenSettings = [...getHiddenSettings(runtimeEnv)];
+    // Whether this deployment's Bedrock model is one the ledger can price.
+    // A model with no rate does not fail a run or log an error; it just bills
+    // every tenant zero, so it is reported next to the feature flag that turned
+    // Bedrock on rather than discovered on an invoice.
+    const foundationCloudBilling = describeBedrockBillingReadiness(runtimeEnv);
     // serverInfo (git SHA + process start) rides on the full-details responses
     // only, so it reaches board/agent actors in authenticated mode or any caller
     // in local_trusted dev — never anonymous authenticated callers. The
@@ -350,6 +356,7 @@ export function healthRoutes(
         foundationCloudExecutionEnabled: isTruthyEnvValue(
           runtimeEnv.FOUNDATION_CLOUD_EXECUTION,
         ),
+        ...(foundationCloudBilling ? { foundationCloudBilling } : {}),
       },
       serverInfo,
       ...(databaseBackup ? { databaseBackup } : {}),
