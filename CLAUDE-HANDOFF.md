@@ -312,6 +312,40 @@ Costo ~$1/mes (KMS). `aws-agentcore.sh destroy` lo apaga.
   `foundation-prod-ecs-task`. Deny explícito sobre ECS/RDS/ELB/EC2, creación de
   usuarios y llaves. No es admin y no debe convertirse en admin.
 
+#### Dos señales nuevas en `/api/health`
+
+Ninguna de las dos cosas que vigilan daba error antes; las dos se descubrían
+tarde y caro.
+
+```jsonc
+// sin sesión (lo que ve el deploy)
+"features": {
+  "foundationCloudExecutionEnabled": true,
+  "foundationCloudBilling": { "priced": true },
+  "runLogMirror": { "consecutiveFailures": 0 }
+}
+
+// con sesión
+"features": {
+  "foundationCloudBilling": { "model": "global.anthropic.claude-sonnet-4-6", "priced": true },
+  "runLogMirror": { "configured": true, "uploads": 12, "failures": 0,
+                    "consecutiveFailures": 0, "lastFailureAt": null,
+                    "lastFailureReason": null }
+}
+```
+
+- **`foundationCloudBilling.priced`** — si `FOUNDATION_BEDROCK_MODEL` apunta a
+  una familia sin tarifa, los runs siguen funcionando y cada fila de
+  `cost_events` queda a 0 centavos. Sin error en ningún sitio. Ahora se ve en el
+  deploy, no en la factura. El id del modelo sólo sale con sesión.
+- **`runLogMirror`** — el mirror a S3 es best-effort a propósito (un fallo no
+  debe tumbar un run), así que unas credenciales malas o una policy denegada
+  eran completamente silenciosas hasta que un roll de la task se llevaba las
+  copias locales. Sólo contadores y el nombre del error: la clave del objeto
+  lleva ids de tenant y de run.
+
+`scripts/verify-foundation-cloud.sh` ya asserta lo primero.
+
 #### Qué significa "harness por tenant_id", en concreto
 
 Revisado a fondo, porque era tu pregunta original. Cuatro piezas, tres ya
