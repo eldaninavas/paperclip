@@ -3,10 +3,15 @@ import { and, eq } from "drizzle-orm";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import {
   createDb,
+  activityLog,
   agents,
+  approvals,
+  budgetIncidents,
+  budgetPolicies,
   companies,
   costEvents,
 } from "@paperclipai/db";
+import { budgetService } from "../services/budgets.ts";
 import { costService } from "../services/costs.ts";
 import {
   normalizeBilledCostCents,
@@ -91,6 +96,12 @@ describeEmbeddedPostgres("Foundation Cloud billing ledger", () => {
   }, 20_000);
 
   afterEach(async () => {
+    // Budget enforcement writes activity and raises an approval, so those come
+    // out before the rows they reference.
+    await db.delete(activityLog);
+    await db.delete(budgetIncidents);
+    await db.delete(approvals);
+    await db.delete(budgetPolicies);
     await db.delete(costEvents);
     await db.delete(agents);
     await db.delete(companies);
@@ -286,5 +297,67 @@ describeEmbeddedPostgres("Foundation Cloud billing ledger", () => {
     expect(row?.billingType).toBe("subscription_included");
     expect(row?.costCents).toBe(0);
     expect(row?.inputTokens).toBe(120_000);
+  });
+
+  it("stops a tenant once its Bedrock spend reaches the budget hard stop", async () => {
+    // The other tests prove a run is priced. This is what the price is for: a
+    // tenant that runs past its ceiling has to actually be stopped, or
+    // "measurable costs" is just a number on a page.
+    const { companyId, agentId } = await seedTenant("Tenant With A Ceiling");
+    await db.insert(budgetPolicies).values({
+      companyId,
+      scopeType: "company",
+      scopeId: companyId,
+      metric: "billed_cents",
+      windowKind: "calendar_month_utc",
+      amount: 100,
+      warnPercent: 80,
+      hardStopEnabled: true,
+      notifyEnabled: false,
+      isActive: true,
+    });
+    const budgets = budgetService(db);
+
+    const bedrockRun = (outputTokens: number) =>
+      costs.createEvent(companyId, {
+        agentId,
+        occurredAt: new Date(),
+        ...ledgerRowFor({
+          model: "global.anthropic.claude-sonnet-4-6",
+          provider: "claude",
+          biller: "aws_bedrock",
+          billingType: "metered_api",
+          usage: { inputTokens: 10_000, cachedInputTokens: 0, outputTokens },
+        }),
+      });
+
+    // $0.03 in + $0.45 out = 48 cents. Under the 100-cent ceiling.
+    await bedrockRun(30_000);
+    expect(await budgets.getInvocationBlock(companyId, agentId)).toBeNull();
+
+    // Another 48 cents takes the month to 96. Still under.
+    await bedrockRun(30_000);
+    expect(await budgets.getInvocationBlock(companyId, agentId)).toBeNull();
+
+    // $0.03 + $1.50 = 153 cents, month total 249, past the ceiling.
+    await bedrockRun(100_000);
+    const block = await budgets.getInvocationBlock(companyId, agentId);
+    expect(block?.scopeType).toBe("company");
+    expect(block?.reason).toMatch(/budget/i);
+
+    const [company] = await db
+      .select()
+      .from(companies)
+      .where(eq(companies.id, companyId));
+    expect(company?.status).toBe("paused");
+    expect(company?.spentMonthlyCents).toBe(249);
+
+    const incidents = await db
+      .select()
+      .from(budgetIncidents)
+      .where(eq(budgetIncidents.companyId, companyId));
+    expect(incidents.some((incident) => incident.thresholdType === "hard")).toBe(
+      true,
+    );
   });
 });
