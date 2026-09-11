@@ -104,4 +104,20 @@ describe("run log mirror health", () => {
 
     expect(runLogMirrorHealth().lastFailureReason).not.toContain("run-logs/");
   });
+
+  it("reports configured from the environment before any run has happened", () => {
+    // A health check that runs before the first agent run must not describe a
+    // correctly configured deployment the same way it describes a broken one.
+    const previous = process.env.RUN_LOG_S3_BUCKET;
+    try {
+      delete process.env.RUN_LOG_S3_BUCKET;
+      const bare = runLogMirrorHealth();
+      process.env.RUN_LOG_S3_BUCKET = "paperclip-run-logs";
+      expect(runLogMirrorHealth().configured).toBe(true);
+      expect(bare.uploads).toBe(runLogMirrorHealth().uploads);
+    } finally {
+      if (previous === undefined) delete process.env.RUN_LOG_S3_BUCKET;
+      else process.env.RUN_LOG_S3_BUCKET = previous;
+    }
+  });
 });

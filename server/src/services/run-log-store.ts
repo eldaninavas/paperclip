@@ -167,9 +167,21 @@ function noteMirrorFailure(error: unknown): void {
   mirrorHealth.lastFailureReason = `${name}: ${message}`.slice(0, 200);
 }
 
-/** Current mirror health. Safe to call before any store exists. */
+/**
+ * Current mirror health. Safe to call before any store exists.
+ *
+ * `configured` answers the deployment question — is object storage set up at
+ * all — so it reads the environment rather than waiting for the lazily created
+ * store. Otherwise a health check that runs before the first agent run would
+ * report a correctly configured deployment as having no mirror, which is the
+ * same answer as a misconfigured one.
+ */
 export function runLogMirrorHealth(): RunLogMirrorHealth {
-  return { ...mirrorHealth };
+  return {
+    ...mirrorHealth,
+    configured:
+      mirrorHealth.configured || Boolean(process.env.RUN_LOG_S3_BUCKET?.trim()),
+  };
 }
 
 export function createDurableRunLogStore(options: DurableRunLogStoreOptions): RunLogStore {
