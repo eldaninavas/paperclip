@@ -179,6 +179,7 @@ import {
   MAX_EXCERPT_BYTES,
 } from "../adapters/utils.js";
 import { costService } from "./costs.js";
+import { resolveBedrockCostUsd } from "./bedrock-pricing.js";
 import { trackAgentFirstHeartbeat } from "@paperclipai/shared/telemetry";
 import { getTelemetryClient } from "../telemetry.js";
 import { emitAgentTaskRun } from "./agent-task-run-telemetry.js";
@@ -17177,7 +17178,25 @@ export function heartbeatService(
     const outputTokens = usage?.outputTokens ?? 0;
     const cachedInputTokens = usage?.cachedInputTokens ?? 0;
     const billingType = normalizeLedgerBillingType(result.billingType);
-    const billedCostUsd = resolveCacheAdjustedCostUsd(result);
+    // The adapter's own price first, and a Bedrock price only when it has none.
+    //
+    // Claude Code reports token counts but no cost once CLAUDE_CODE_USE_BEDROCK
+    // is set — it cannot know Foundation's AWS rates — so a Foundation Cloud run
+    // would otherwise be ledgered `unpriced` at zero cents, recording the tokens
+    // a tenant owes without the amount. Priced here, at the one seam every
+    // adapter's result already passes through, rather than inside the adapter:
+    // the rates belong to the account that pays Amazon, not to the tool.
+    //
+    // The adapter keeps precedence, so a customer-supplied Anthropic key still
+    // bills at the price Anthropic reported, and an unrecognized Bedrock model
+    // stays `unpriced` instead of being billed at a guessed rate.
+    const billedCostUsd =
+      resolveCacheAdjustedCostUsd(result) ??
+      resolveBedrockCostUsd(result.model, {
+        inputTokens,
+        cachedInputTokens,
+        outputTokens,
+      });
     const additionalCostCents = normalizeBilledCostCents(
       billedCostUsd,
       billingType,

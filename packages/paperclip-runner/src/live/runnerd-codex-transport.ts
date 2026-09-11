@@ -3550,6 +3550,25 @@ class DurablePrpCodexTransport implements CodexAppServerTransport {
 }
 
 export function defaultCapabilityRunnerdBinary(): string {
+  // Resolved relative to this module rather than to `packageRoot`, because the
+  // two shipped layouts put the package root at different depths. In the
+  // workspace the module is `<pkg>/dist/live/`, so `packageRoot` is `<pkg>` and
+  // the binary is `<pkg>/dist/bin/`. The server build flattens the package into
+  // its own tree (`cp -R packages/paperclip-runner/dist/. server/dist/vendor/
+  // paperclip-runner/`), so the module becomes `vendor/paperclip-runner/live/`
+  // — one directory shallower. `packageRoot` then resolves to `vendor`, and
+  // both of the old candidates pointed at paths that exist in no image, so a
+  // deployed server failed every native run with
+  // `runner_remote_artifact_unavailable` even though the staged binary was
+  // sitting next to it.
+  //
+  // `../bin` off the module directory is the one expression that names the
+  // staged binary in both layouts: `dist/live/../bin` and
+  // `paperclip-runner/live/../bin`.
+  const colocated = fileURLToPath(
+    new URL(`../bin/paperclip-runnerd${executableSuffix}`, import.meta.url),
+  );
+  if (existsSync(colocated)) return colocated;
   const staged = resolve(
     packageRoot,
     `dist/bin/paperclip-runnerd${executableSuffix}`,

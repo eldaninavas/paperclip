@@ -107,7 +107,6 @@ import { FooterNav } from "./onboarding/FooterNav";
 import { OnboardingHeading } from "./onboarding/OnboardingPrimitives";
 import { DEFAULT_AGENT_ROLE } from "../lib/onboarding-agent-role";
 import { capsuleHeroMotion } from "./onboarding/onboarding-motion";
-import { Badge } from "@/components/ui/badge";
 import {
   Building2,
   Bot,
@@ -2380,7 +2379,10 @@ function OnboardingWizardInner({
                   : "w-full max-w-md px-8 py-12",
               )}
             >
-              <FoundationBrand className="mb-10 justify-center text-foreground" />
+              <FoundationBrand
+                className="mb-10 justify-center text-foreground"
+                showMark={false}
+              />
 
               {/* Full-length progress bar (brand .wsteps/.wstep) — segment N
                   filled once step ≥ N. Completed segments jump back.
@@ -2853,28 +2855,7 @@ function OnboardingWizardInner({
               {/* Step 4: Connect a model — adapter + model + env check (capsule above) */}
               {step === 4 && (
                 <div className="space-y-8">
-                  {foundationCloudExecution && (
-                    <div className="rounded-xl border border-border bg-(--foundation-surface-subtle) p-4">
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex items-start gap-3">
-                          <span className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-border bg-background text-muted-foreground">
-                            <Cloud className="size-4" />
-                          </span>
-                          <div>
-                            <p className="text-sm font-medium text-foreground">Foundation Cloud</p>
-                            <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                              El agente se ejecuta en un runtime aislado administrado por Foundation,
-                              no en este navegador ni en tu computadora.
-                            </p>
-                          </div>
-                        </div>
-                        <Badge variant={cloudRuntimeReady ? "secondary" : "outline"}>
-                          {cloudRuntimeReady ? "Runtime listo" : "Sin activar"}
-                        </Badge>
-                      </div>
-                    </div>
-                  )}
-                  {/* The two cards are self-describing; an "Adapter type"
+                  {/* The source cards are self-describing; an "Adapter type"
                       eyebrow above them named the mechanism rather than the
                       choice. */}
                   <div>
@@ -2882,31 +2863,43 @@ function OnboardingWizardInner({
                         connect-step prototype is drawn with, so the shipped step
                         and the design under review cannot drift apart.
 
-                        Sources come from `recommendedAdapters`, not a list
-                        written here. That filter is `recommended` in the display
-                        registry, which today means Claude Code and Codex and
-                        nothing else — so the row stays two tiles because the
-                        registry says so, and a third would appear here the day
-                        someone marks one rather than the day someone remembers
-                        to edit this file. */}
+                        Direct sources come from `recommendedAdapters`, while a
+                        hosted deployment inserts Foundation Cloud between the
+                        two recognizable provider choices. */}
                     <ModelSourceTiles
                       label="Model source"
-                      sources={recommendedAdapters.map((opt) => ({
-                        id: opt.type,
-                        // The vendor name where this step has one, the registry's
-                        // tool name where it does not. `MODEL_SOURCE_NAMES` was
-                        // added with the reasoning above it and then never read,
-                        // so the row went on showing "Claude Code" and "Codex"
-                        // — the tool names — under a heading asking which
-                        // provider you are signing in to.
-                        //
-                        // The fallback is what keeps the row rendering if the
-                        // registry ever marks a third adapter `recommended`:
-                        // an unnamed source gets its tool name rather than
-                        // nothing.
-                        label: MODEL_SOURCE_NAMES[opt.type] ?? opt.label,
-                        icon: <ModelSourceMark type={opt.type} Fallback={opt.icon} />,
-                      }))}
+                      sources={foundationCloudExecution
+                        ? [
+                            ...recommendedAdapters
+                              .filter((opt) => opt.type === "codex_local")
+                              .map((opt) => ({
+                                id: opt.type,
+                                label: "ChatGPT",
+                                icon: <ModelSourceMark type={opt.type} Fallback={opt.icon} />,
+                              })),
+                            {
+                              id: "foundation_cloud",
+                              label: "Foundation Cloud",
+                              icon: <Cloud className="size-full" />,
+                              tag: "Coming online",
+                              // Until the native AgentCore path is qualified in
+                              // this deployment, a click must not silently fall
+                              // through to a customer-supplied API key.
+                              disabled: true,
+                            },
+                            ...recommendedAdapters
+                              .filter((opt) => opt.type === "claude_local")
+                              .map((opt) => ({
+                                id: opt.type,
+                                label: MODEL_SOURCE_NAMES[opt.type] ?? opt.label,
+                                icon: <ModelSourceMark type={opt.type} Fallback={opt.icon} />,
+                              })),
+                          ]
+                        : recommendedAdapters.map((opt) => ({
+                            id: opt.type,
+                            label: MODEL_SOURCE_NAMES[opt.type] ?? opt.label,
+                            icon: <ModelSourceMark type={opt.type} Fallback={opt.icon} />,
+                          }))}
                       mode={runtimeCredentialMode}
                       selectedId={
                         sourcePicked &&

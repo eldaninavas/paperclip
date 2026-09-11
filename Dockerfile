@@ -98,6 +98,16 @@ ARG PAPERCLIP_BUILD_COMMIT=""
 ENV NODE_OPTIONS=--max-old-space-size=4096
 RUN pnpm --filter @paperclipai/server build
 RUN test -f server/dist/index.js || (echo "ERROR: server build output missing" && exit 1)
+# The native runner binary, checked at the exact path the running server looks
+# it up from. `pnpm --filter @paperclipai/server build` reaches it indirectly
+# (prepare:runner-vendor -> the runner package's `build` -> `build:binary`),
+# and then flattens the package into server/dist/vendor/paperclip-runner/ —
+# so the binary the server resolves is the vendored copy, not the one under
+# packages/. Asserting the vendored path is what makes a silently missing or
+# relocated runner fail the build instead of failing every native run at
+# runtime with `runner_remote_artifact_unavailable`.
+RUN test -x server/dist/vendor/paperclip-runner/bin/paperclip-runnerd \
+  || (echo "ERROR: paperclip-runnerd missing from the server vendor tree" && exit 1)
 RUN rm -rf packages/paperclip-runner/runner/target
 
 FROM base AS production

@@ -87,15 +87,56 @@ jobs:
           SERVICE: foundation-dev
           FAMILY: foundation-dev
           TARGET_GROUP: ${{ vars.AWS_TARGET_GROUP_ARN }}
+          # Foundation Cloud runs the agent against Bedrock in Foundation's own
+          # account, so the model configuration belongs to the deployment, not
+          # to each tenant's agent: a customer never supplies an AWS credential.
+          BEDROCK_MODEL: ${{ vars.FOUNDATION_BEDROCK_MODEL }}
+          # Durable run logs. Unset -> run-log-store degrades to local files
+          # (see resolveRunLogS3), which is the pre-Foundation-Cloud behaviour,
+          # so a missing variable weakens durability without breaking a deploy.
+          RUN_LOG_BUCKET: ${{ vars.RUN_LOG_S3_BUCKET }}
         run: |
           aws ecs describe-task-definition --task-definition "$FAMILY" --query taskDefinition > task-definition.json
-          jq --arg image "$IMAGE" '
+          # Every Foundation-Cloud variable is stripped before being re-added so
+          # the task definition converges on what this workflow declares instead
+          # of accumulating stale copies across revisions.
+          jq --arg image "$IMAGE" --arg model "$BEDROCK_MODEL" --arg bucket "$RUN_LOG_BUCKET" '
             .containerDefinitions |= map(
               if .name == "foundation" then
                 .image = $image
                 | .environment = (
-                    ((.environment // []) | map(select(.name != "FOUNDATION_CLOUD_EXECUTION")))
-                    + [{"name":"FOUNDATION_CLOUD_EXECUTION","value":"true"}]
+                    ((.environment // []) | map(select(
+                      .name != "FOUNDATION_CLOUD_EXECUTION"
+                      and .name != "CLAUDE_CODE_USE_BEDROCK"
+                      and .name != "ANTHROPIC_MODEL"
+                      and .name != "AWS_REGION"
+                      and .name != "RUN_LOG_S3_BUCKET"
+                      and .name != "RUN_LOG_S3_REGION"
+                      and .name != "RUN_LOG_S3_PREFIX"
+                      and .name != "RUN_LOG_S3_FORCE_PATH_STYLE"
+                      and .name != "RUN_LOG_S3_INFLIGHT_MIRROR_SECONDS"
+                    )))
+                    + [
+                        {"name":"FOUNDATION_CLOUD_EXECUTION","value":"true"},
+                        # Claude Code talks to Bedrock instead of api.anthropic.com.
+                        # Bedrock is available in mx-central-1, the same region as
+                        # this cluster, so a tenant's tokens never leave the region
+                        # the service runs in.
+                        {"name":"CLAUDE_CODE_USE_BEDROCK","value":"1"},
+                        {"name":"AWS_REGION","value":"mx-central-1"}
+                      ]
+                    + (if $model == "" then [] else [{"name":"ANTHROPIC_MODEL","value":$model}] end)
+                    + (if $bucket == "" then [] else [
+                        {"name":"RUN_LOG_S3_BUCKET","value":$bucket},
+                        {"name":"RUN_LOG_S3_REGION","value":"mx-central-1"},
+                        {"name":"RUN_LOG_S3_PREFIX","value":"run-logs"},
+                        # Real AWS S3 rejects path-style addressing; the store
+                        # defaults to true for S3-compatible endpoints.
+                        {"name":"RUN_LOG_S3_FORCE_PATH_STYLE","value":"false"},
+                        # Mirror the tail every 30s so a rolled task loses at
+                        # most half a minute of a tenant's agent output.
+                        {"name":"RUN_LOG_S3_INFLIGHT_MIRROR_SECONDS","value":"30"}
+                      ] end)
                   )
               else . end
             )
@@ -134,10 +175,17 @@ jobs:
           CLUSTER: foundation
           SERVICE: foundation-prod
           FAMILY: foundation-prod
+          # Same Foundation Cloud configuration as development, so promoting an
+          # image cannot quietly move production onto a different model or drop
+          # its durable run logs. Both come from the production environment's
+          # own variables; an unset bucket degrades to local files rather than
+          # failing the promotion.
+          BEDROCK_MODEL: ${{ vars.FOUNDATION_BEDROCK_MODEL }}
+          RUN_LOG_BUCKET: ${{ vars.RUN_LOG_S3_BUCKET }}
         run: |
           aws ecs describe-task-definition --task-definition "$FAMILY" --query taskDefinition > task-definition.json
           START_COMMAND='case "$DATABASE_URL" in *sslmode=*) ;; *\?*) DATABASE_URL="${DATABASE_URL}&sslmode=require" ;; *) DATABASE_URL="${DATABASE_URL}?sslmode=require" ;; esac; export DATABASE_URL; exec node --import ./server/node_modules/tsx/dist/loader.mjs server/dist/index.js'
-          jq --arg image "$IMAGE" --arg startCommand "$START_COMMAND" '
+          jq --arg image "$IMAGE" --arg startCommand "$START_COMMAND" --arg model "$BEDROCK_MODEL" --arg bucket "$RUN_LOG_BUCKET" '
             .containerDefinitions |= map(
               if .name == "foundation" then
                 .image = $image
@@ -150,11 +198,29 @@ jobs:
                       and .name != "BOOTSTRAP_SCRIPT_B64"
                       and .name != "FOUNDATION_CLOUD_EXECUTION"
                       and .name != "PAPERCLIP_DEPLOYMENT_EXPOSURE"
+                      and .name != "CLAUDE_CODE_USE_BEDROCK"
+                      and .name != "ANTHROPIC_MODEL"
+                      and .name != "AWS_REGION"
+                      and .name != "RUN_LOG_S3_BUCKET"
+                      and .name != "RUN_LOG_S3_REGION"
+                      and .name != "RUN_LOG_S3_PREFIX"
+                      and .name != "RUN_LOG_S3_FORCE_PATH_STYLE"
+                      and .name != "RUN_LOG_S3_INFLIGHT_MIRROR_SECONDS"
                     )))
                     + [
                         {"name":"FOUNDATION_CLOUD_EXECUTION","value":"true"},
-                        {"name":"PAPERCLIP_DEPLOYMENT_EXPOSURE","value":"public"}
+                        {"name":"PAPERCLIP_DEPLOYMENT_EXPOSURE","value":"public"},
+                        {"name":"CLAUDE_CODE_USE_BEDROCK","value":"1"},
+                        {"name":"AWS_REGION","value":"mx-central-1"}
                       ]
+                    + (if $model == "" then [] else [{"name":"ANTHROPIC_MODEL","value":$model}] end)
+                    + (if $bucket == "" then [] else [
+                        {"name":"RUN_LOG_S3_BUCKET","value":$bucket},
+                        {"name":"RUN_LOG_S3_REGION","value":"mx-central-1"},
+                        {"name":"RUN_LOG_S3_PREFIX","value":"run-logs"},
+                        {"name":"RUN_LOG_S3_FORCE_PATH_STYLE","value":"false"},
+                        {"name":"RUN_LOG_S3_INFLIGHT_MIRROR_SECONDS","value":"30"}
+                      ] end)
                   )
                 | .healthCheck = {"command":["CMD-SHELL","curl -fsS http://127.0.0.1:3100/api/health || exit 1"],"interval":30,"timeout":5,"retries":3,"startPeriod":90}
               else . end

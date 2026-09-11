@@ -1951,7 +1951,13 @@ describe("OnboardingWizard restore-gate (stale localStorage across accounts)", (
       );
 
       expect(document.body.textContent).toContain("Foundation Cloud");
-      expect(document.body.textContent).toContain("Runtime listo");
+      expect(document.body.querySelector('img[src^="/foundation-mark.svg"]')).toBeNull();
+      const tiles = [...document.body.querySelectorAll<HTMLButtonElement>("button[aria-checked]")];
+      expect(tiles[0]?.textContent).toContain("ChatGPT");
+      expect(tiles[1]?.textContent).toContain("Foundation Cloud");
+      expect(tiles[1]?.textContent).toContain("Coming online");
+      expect(tiles[1]?.disabled).toBe(true);
+      expect(tiles[2]?.textContent).toContain("Claude");
       expect(document.body.textContent).toContain("Conecta una API key propia");
       expect(document.body.textContent).not.toContain("Local subscription");
       expect(document.body.textContent).not.toContain("Use subscription instead");

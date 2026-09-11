@@ -21,6 +21,9 @@ export type ModelSource = {
   label: string;
   /** The brand mark, rendered into a 30px square. */
   icon: ReactNode;
+  /** Optional source-specific commercial/runtime label. */
+  tag?: string;
+  disabled?: boolean;
 };
 
 const CREDENTIAL_TAG_LABEL: Record<CredentialMode, string> = {
@@ -37,18 +40,19 @@ const CREDENTIAL_TAG_LABEL: Record<CredentialMode, string> = {
  * what makes the outgoing label fall out of frame rather than slide past the
  * tile's padding and over the row below.
  */
-export function CredentialTag({ mode }: { mode: CredentialMode }) {
+export function CredentialTag({ mode, label }: { mode: CredentialMode; label?: string }) {
+  const visibleLabel = label ?? CREDENTIAL_TAG_LABEL[mode];
   return (
     <span className="relative flex h-4 w-full items-center justify-center overflow-hidden text-(length:--text-micro) text-muted-foreground">
       <AnimatePresence initial={false} mode="sync">
         <motion.span
-          key={mode}
+          key={`${mode}:${visibleLabel}`}
           className="absolute inset-0 flex items-center justify-center whitespace-nowrap"
           initial={{ opacity: 0, y: TAG_SWAP_TRAVEL }}
           animate={{ opacity: 1, y: 0, transition: TAG_SWAP_ENTER }}
           exit={{ opacity: 0, y: TAG_SWAP_TRAVEL, transition: TAG_SWAP_EXIT }}
         >
-          {CREDENTIAL_TAG_LABEL[mode]}
+          {visibleLabel}
         </motion.span>
       </AnimatePresence>
     </span>
@@ -74,6 +78,8 @@ function ModelSourceTile({
       type="button"
       role="radio"
       aria-checked={selected}
+      aria-disabled={source.disabled || undefined}
+      disabled={source.disabled}
       onClick={onSelect}
       className={cn(
         "flex min-w-0 flex-1 cursor-pointer flex-col items-center gap-1.5 self-stretch rounded-md border p-3",
@@ -91,7 +97,9 @@ function ModelSourceTile({
         //
         // Hover stops short of the selected fill, so pointing at a tile says
         // "this one is live" rather than "this one is chosen".
-        selected
+        source.disabled
+          ? "cursor-not-allowed border-border bg-card opacity-50"
+          : selected
           ? "border-foreground/40 bg-accent"
           : "border-border bg-card hover:bg-accent/40",
       )}
@@ -109,7 +117,7 @@ function ModelSourceTile({
       <span className="text-(length:--text-compact) font-medium text-foreground">
         {source.label}
       </span>
-      <CredentialTag mode={mode} />
+      <CredentialTag mode={mode} label={source.tag} />
     </button>
   );
 }
@@ -138,12 +146,13 @@ export function ModelSourceTiles({
    * the key having failed.
    */
   const moveSelection = (delta: number) => {
-    if (sources.length === 0) return;
-    const current = sources.findIndex((source) => source.id === selectedId);
+    const enabledSources = sources.filter((source) => !source.disabled);
+    if (enabledSources.length === 0) return;
+    const current = enabledSources.findIndex((source) => source.id === selectedId);
     // Nothing picked yet: either arrow enters the row from the near end.
     const from = current === -1 ? (delta > 0 ? -1 : 0) : current;
-    const next = (from + delta + sources.length) % sources.length;
-    const target = sources[next]!;
+    const next = (from + delta + enabledSources.length) % enabledSources.length;
+    const target = enabledSources[next]!;
     onSelect(target.id);
     tiles.current.get(target.id)?.focus();
   };
@@ -169,7 +178,9 @@ export function ModelSourceTiles({
           source={source}
           mode={mode}
           selected={source.id === selectedId}
-          onSelect={() => onSelect(source.id)}
+          onSelect={() => {
+            if (!source.disabled) onSelect(source.id);
+          }}
           buttonRef={(node) => {
             if (node) tiles.current.set(source.id, node);
             else tiles.current.delete(source.id);

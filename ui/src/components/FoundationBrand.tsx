@@ -3,10 +3,15 @@ import { cn, SIDEBAR_RAIL_HIDDEN_LABEL } from "@/lib/utils";
 interface FoundationBrandProps {
   compact?: boolean;
   className?: string;
+  showMark?: boolean;
 }
 
 /** Foundation brand using the same canonical Pillar geometry as the favicon. */
-export function FoundationBrand({ compact = false, className }: FoundationBrandProps) {
+export function FoundationBrand({
+  compact = false,
+  className,
+  showMark = true,
+}: FoundationBrandProps) {
   return (
     <div
       aria-label="Foundation · Davaria"
@@ -16,9 +21,11 @@ export function FoundationBrand({ compact = false, className }: FoundationBrandP
         className,
       )}
     >
-      <span className="flex size-7 shrink-0 items-center justify-center" aria-hidden="true">
-        <img src="/foundation-mark.svg?v=pillar-4" alt="" className="size-6" />
-      </span>
+      {showMark && (
+        <span className="flex size-7 shrink-0 items-center justify-center" aria-hidden="true">
+          <img src="/foundation-mark.svg?v=pillar-4" alt="" className="size-6" />
+        </span>
+      )}
       <span className={compact ? SIDEBAR_RAIL_HIDDEN_LABEL : "min-w-0 leading-none"}>
         <span className="block truncate text-(length:--text-compact) font-semibold tracking-tight">
           Foundation
