@@ -54,8 +54,12 @@
 ### Outputs de agentes
 
 - `run-log-store` ya escribe `logRef = <companyId>/<agentId>/<runId>.ndjson` y sabe espejarlo a S3.
-- Bucket creado: **`paperclip-agentcore-foundation-runlogs-dev`** en `mx-central-1`, cifrado AES256, sin acceso público.
+- Buckets creados en `mx-central-1`, cifrado AES256, sin acceso público:
+  - dev: **`paperclip-agentcore-foundation-runlogs-dev`**
+  - prod: **`paperclip-agentcore-foundation-runlogs-prod`**
   (El prefijo `paperclip-agentcore-` viene de lo que permite la política del usuario CLI; renombrarlo después es sólo cambiar una variable.)
+- Variables de GitHub puestas en los entornos `development` y `production`: `RUN_LOG_S3_BUCKET` y `FOUNDATION_BEDROCK_MODEL`.
+- Verificado a mano: escribir en `run-logs/<companyId>/<agentId>/x.ndjson` funciona y el objeto queda cifrado (AES256).
 
 ## AgentCore — laboratorio, no producción
 
@@ -127,6 +131,18 @@ JSON
 aws iam put-role-policy --role-name foundation-dev-ecs-task \
   --policy-name FoundationCloudBedrockAndRunLogs \
   --policy-document file:///tmp/foundation-task.json
+
+# Y lo mismo para produccion, con su propio bucket:
+sed 's/runlogs-dev/runlogs-prod/g' /tmp/foundation-task.json > /tmp/foundation-task-prod.json
+aws iam put-role-policy --role-name foundation-prod-ecs-task \
+  --policy-name FoundationCloudBedrockAndRunLogs \
+  --policy-document file:///tmp/foundation-task-prod.json
+```
+
+Después, para comprobar que quedó bien:
+
+```bash
+bash scripts/verify-foundation-cloud.sh foundation dev
 ```
 
 Intenté evitar esto con una **bucket policy** (concede desde el lado del recurso,
