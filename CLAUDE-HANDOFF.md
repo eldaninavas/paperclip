@@ -325,7 +325,38 @@ runner. El provider redacta el error a propósito (`redact_aws_error`), y
 `RUST_LOG=aws_sdk_s3=debug` no aparece en el log del servidor, así que el detalle
 del SDK no sale por ninguna vía disponible desde fuera.
 
-**Siguiente paso (requiere tocar el runner):** instrumentar
+### BUG DE PRODUCCIÓN ENCONTRADO Y CORREGIDO
+
+Instrumenté el `put_object` del provider (temporalmente; ya revertido) y el error
+real apareció:
+
+```
+CredentialsNotLoaded: ProviderChainError
+  ProviderAttempt { name: "Environment", error: "environment variable not set" }
+```
+
+Causa: `NATIVE_PROVIDER_HOST_ENV_KEYS` en `native-session-executor.ts` es la
+allowlist de variables del host que hereda el runner nativo, y llevaba `PATH`,
+`HOME`, `XDG_*`… **y nada de AWS**. El provider de AgentCore asume su rol de
+invocación, así que necesita credenciales base para asumirlo; sin ellas su
+primera llamada falla, y como `AssumeRoleProvider` es perezoso, el fallo aparece
+recién en el upload a S3 con un mensaje que no dice nada.
+
+**Esto habría roto también producción**: en ECS el SDK llega al rol de la task
+mediante `AWS_CONTAINER_CREDENTIALS_RELATIVE_URI`, una variable de entorno que
+ECS inyecta y que esta lista descartaba. Con la política IAM aplicada y sin este
+arreglo, Foundation Cloud habría fallado igual y con el mismo mensaje opaco.
+
+Corregido: la allowlist ahora incluye las variables de credenciales de
+contenedor, de web identity, estáticas y de perfil.
+
+**Queda un segundo factor en local:** tras el arreglo, el run local sigue dando
+`CredentialsNotLoaded`. El arreglo es correcto y necesario (el bug de ECS es
+real), pero en esta máquina algo más impide que las credenciales lleguen al
+proceso — probablemente el runner se lanza por una ruta que no pasa por
+`buildNativeProviderEnvironment`. Ése es el siguiente hilo del que tirar.
+
+**Antiguo siguiente paso (ya hecho):** instrumentar
 `aws_agentcore_provider.rs` para emitir el error sin redactar en modo
 desarrollo — el `map_err` de `put_object` alrededor de la línea 470 — recompilar
 y repetir. Sin eso se diagnostica a ciegas.
