@@ -855,7 +855,12 @@ o me amplías esos dos accesos a sabiendas de lo que significan.
 
 ### Pendiente después de desbloquear
 
-1. Escalar `foundation-dev` a 1 (el deploy lo apaga al terminar) y ejecutar un agente.
+1. Desplegar con `-f keep_development_running=true` (ya no hace falta escalar a
+   mano) y ejecutar un agente. Recuerda que dev cobra hasta que otro deploy sin
+   la bandera lo baje.
+1b. Confirmar en dev que `enableNativeRunner` está en `true`: en prod está en
+   `false`, y con eso la ruta de AgentCore no se selecciona aunque haya cuota.
+   `GET /api/instance/settings/experimental`.
 2. Verificar `cost_events`: `cost_cents > 0` y `cost_status = reported` con `biller = aws_bedrock`.
 3. Verificar objetos en `s3://paperclip-agentcore-foundation-runlogs-dev/run-logs/<companyId>/<agentId>/`.
 4. Elegir y contratar proveedor de sandbox (ver RIESGO ABIERTO).
