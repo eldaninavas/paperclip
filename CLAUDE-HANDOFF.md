@@ -312,6 +312,30 @@ Costo ~$1/mes (KMS). `aws-agentcore.sh destroy` lo apaga.
   `foundation-prod-ecs-task`. Deny explícito sobre ECS/RDS/ELB/EC2, creación de
   usuarios y llaves. No es admin y no debe convertirse en admin.
 
+#### Dos fugas de ingreso encontradas en el camino de tokens
+
+Ninguna daba error. Las dos hacían que Foundation le pagara a Amazon tokens que
+ningún tenant ve en su factura.
+
+1. **Adaptador `claude-local`, camino de respaldo.** `claudeModelUsageTotals`
+   suma `cacheCreationInputTokens` dentro de `inputTokens`, porque Anthropic los
+   cobra como tokens de prompt — lo dice su propio comentario. Pero cuando el
+   evento `result` no trae `modelUsage`, el respaldo leía sólo `input_tokens` y
+   esos tokens desaparecían del run. Revertir el arreglo rompe el test nuevo.
+
+2. **Camino nativo (AgentCore).** `runner-core` **sí** calcula `cacheWriteTokens`
+   para cada reporte de uso, sumando los buckets `ephemeral_1h` y `ephemeral_5m`
+   del proveedor, y hay un test en Rust que lo comprueba. El lado TypeScript
+   **nunca leía ese campo**: todo lo que una sesión gastara construyendo su
+   cache se perdía antes de llegar al ledger.
+
+Las dos quedan sumadas a `inputTokens`, que es lo que ya hacía el adaptador
+local. Bedrock cobra la escritura de cache algo por encima del input ($3.75
+contra $3 por millón en Sonnet 4.6), así que todavía se factura ~20% por debajo
+en esos tokens concretos — contra 100% por debajo antes. El arreglo exacto
+necesita una columna en `cost_events` para que la fila siga siendo recomputable;
+`resolveBedrockCostUsd` ya acepta el argumento `cacheWriteInputTokens`.
+
 #### Por qué dev siempre respondía 503 (resuelto)
 
 No era un fallo del despliegue. `foundation-deploy.yml` **apaga dev a propósito**
