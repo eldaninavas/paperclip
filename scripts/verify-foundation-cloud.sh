@@ -160,12 +160,17 @@ print('' if b is None else f\"{b.get('priced')}|{b.get('model','(oculto sin sesi
     mirror="$(printf '%s' "$body" | python3 -c "
 import json,sys
 m=json.load(sys.stdin).get('features',{}).get('runLogMirror')
-print('' if m is None else str(m.get('reachable')))" 2>/dev/null)"
-    case "$mirror" in
+print('' if m is None else f\"{m.get('reachable')}|{m.get('writable')}\")" 2>/dev/null)"
+    case "${mirror%%|*}" in
       True)  ok "el contenedor alcanza el bucket de run logs (sonda desde dentro de la task)" ;;
       False) bad "el contenedor NO alcanza el bucket: los outputs no saldrían de la task" ;;
-      None)  note "sonda de almacenamiento todavía sin responder; vuelve a pedir /api/health" ;;
+      None)  note "sonda de lectura todavía sin responder; vuelve a pedir /api/health" ;;
       *)     note "la instancia no reporta runLogMirror (imagen anterior a este cambio)" ;;
+    esac
+    case "${mirror##*|}" in
+      True)  ok "y puede ESCRIBIR en él (PutObject + limpieza, desde la task)" ;;
+      False) bad "el contenedor puede leer pero NO escribir: el output de un tenant se quedaría en el disco de la task" ;;
+      None)  note "sonda de escritura todavía sin responder" ;;
     esac
   else
     bad "${HOST} no devolvió salud (¿token sin acceso a esta app?)"
