@@ -125,16 +125,38 @@ hasta que se solicita un aumento. Sólo las cuotas de *batch inference* son > 0.
 **Esto bloquea Foundation Cloud por completo**, con o sin permisos, con o sin
 despliegue. Ningún agente puede ejecutarse hasta que AWS apruebe cuota.
 
-**Qué hacer (sólo tú puedes; `servicequotas:RequestServiceQuotaIncrease` me está
-denegado):** en la consola → Service Quotas → Amazon Bedrock → región
-`mx-central-1`, y pedir aumento de al menos:
+Comprobado también en `us-west-2`, donde la cuenta **sí** tiene 6.000.000
+tokens/minuto para Sonnet 4.6 — pero la cuota **por día** sigue en 0, así que
+tampoco pasa una sola invocación. El límite diario manda sobre el de minuto.
 
-- *Global cross-region model inference tokens per minute for Anthropic Claude Sonnet 4.6*
-- *Global cross-region model inference tokens per day for Anthropic Claude Sonnet 4.6*
-- *Global cross-region model inference requests per minute for Anthropic Claude Sonnet 4.6*
+**Los códigos exactos (mx-central-1, Sonnet 4.6):**
 
-La aprobación de AWS tarda de horas a días. **Es el camino crítico del
-lanzamiento**: conviene pedirlo ya, aunque el resto no esté listo.
+| Código | Valor | ¿Ajustable? | Cuota |
+|---|---|---|---|
+| `L-7BEE40FB` | 0 | sí | tokens por minuto (global cross-region) |
+| `L-F6E116D7` | 0 | sí | requests por minuto (global cross-region) |
+| **`L-248E47B7`** | **0** | **NO** | **tokens por día (global cross-region)** |
+
+**Esto es lo importante: la cuota que bloquea NO es ajustable por autoservicio.**
+No hay formulario de Service Quotas que la suba. AWS la gestiona según el
+historial de la cuenta, y una cuenta nueva sin facturación previa arranca en 0.
+
+**Qué hacer:**
+1. Abrir un caso en **AWS Support** (Account and billing → Service limit
+   increase → Bedrock) pidiendo habilitar inferencia on-demand de Claude en la
+   cuenta. Menciona que `L-248E47B7` está en 0 y no es ajustable.
+2. En paralelo, pedir por Service Quotas las dos ajustables:
+
+```bash
+aws service-quotas request-service-quota-increase --region mx-central-1 \
+  --service-code bedrock --quota-code L-7BEE40FB --desired-value 2000000
+aws service-quotas request-service-quota-increase --region mx-central-1 \
+  --service-code bedrock --quota-code L-F6E116D7 --desired-value 1000
+```
+
+Suele ayudar tener un método de pago verificado y algo de facturación en la
+cuenta. **Es el camino crítico del lanzamiento**: sin esto no hay Foundation
+Cloud, por mucho que el código y la infraestructura estén listos.
 
 Nota: la invocación de AgentCore en us-east-1 sí llegó al modelo antes
 (`model_call_count: 4`), probablemente consumiendo el margen inicial. Después de
