@@ -310,10 +310,30 @@ distinguir entre un permiso que falta en el rol asumido y otra causa. El error
 que emite el provider es genérico (`AWS AgentCore request failed`), sin el
 detalle del SDK.
 
-**Siguiente paso concreto:** repetir este run con trazas del SDK de AWS activas
-(`AWS_SDK_LOAD_CONFIG`/`RUST_LOG=aws_sdk_s3=debug` en el runner) para ver el
-error real de S3/KMS, y comparar con los permisos de
-`paperclip-agentcore-runner-development-us-east-1`.
+**Descartado ya, con pruebas — no hace falta repetirlo:**
+
+| Hipótesis | Comprobación | Resultado |
+|---|---|---|
+| Al rol le faltan permisos S3 | `simulate-principal-policy` sobre `<prefix>/assets/*` | **allowed** |
+| Al rol le falta KMS | simulado con `kms:ViaService` y encryption context | **allowed** |
+| El rol no se puede asumir | `sts assume-role` real | **funciona** |
+| La subida en sí falla | `put-object` con SSE-KMS a la ruta exacta, con el rol asumido | **200 OK** |
+| El runner no hereda credenciales | relanzado con `AWS_ACCESS_KEY_ID`/`SECRET` explícitos | **falla igual** |
+
+Es decir: permisos, rol y subida funcionan **manualmente**; falla sólo dentro del
+runner. El provider redacta el error a propósito (`redact_aws_error`), y
+`RUST_LOG=aws_sdk_s3=debug` no aparece en el log del servidor, así que el detalle
+del SDK no sale por ninguna vía disponible desde fuera.
+
+**Siguiente paso (requiere tocar el runner):** instrumentar
+`aws_agentcore_provider.rs` para emitir el error sin redactar en modo
+desarrollo — el `map_err` de `put_object` alrededor de la línea 470 — recompilar
+y repetir. Sin eso se diagnostica a ciegas.
+
+Merece la pena sospechar primero de la **región**: el runner construye su cliente
+S3 desde la config del entorno, y el bucket de contexto está en `us-east-1`
+mientras la aplicación vive en `mx-central-1`. Un cliente creado con la región
+equivocada da exactamente este fallo opaco.
 
 ### Por qué la verificación final también te necesita a ti
 
