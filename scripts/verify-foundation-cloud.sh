@@ -92,7 +92,39 @@ else
 fi
 echo
 
-echo "4. Ledger: consulta para correr contra la base de la instancia"
+echo "4. Instancia desplegada (requiere service token de Cloudflare Access)"
+# Cloudflare Access fronts both hosts, so an unauthenticated probe only ever sees
+# a 302 to its login page. A service token is the supported way to call the API
+# programmatically; without one this section reports what it cannot check rather
+# than guessing the instance is healthy.
+HOST="foundation-${ENVIRONMENT}.davaria.app"
+[[ "$ENVIRONMENT" == "prod" ]] && HOST="foundation.davaria.app"
+if [[ -n "${CF_ACCESS_CLIENT_ID:-}" && -n "${CF_ACCESS_CLIENT_SECRET:-}" ]]; then
+  body="$(curl -s --max-time 25 \
+    -H "CF-Access-Client-Id: ${CF_ACCESS_CLIENT_ID}" \
+    -H "CF-Access-Client-Secret: ${CF_ACCESS_CLIENT_SECRET}" \
+    "https://${HOST}/api/health")"
+  if printf '%s' "$body" | grep -q '"status"'; then
+    ok "salud de ${HOST} alcanzada"
+    for field in foundationCloudExecutionEnabled commit; do
+      value="$(printf '%s' "$body" | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+f=sys.argv[1]
+print(d.get('features',{}).get(f, d.get(f,'—')))" "$field" 2>/dev/null)"
+      note "${field}: ${value}"
+    done
+  else
+    bad "${HOST} no devolvió salud con el service token (¿token sin acceso a esta app?)"
+  fi
+else
+  status="$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "https://${HOST}/api/health")"
+  bad "sin service token: ${HOST} responde HTTP ${status} (login de Cloudflare)"
+  note "Exporta CF_ACCESS_CLIENT_ID y CF_ACCESS_CLIENT_SECRET para verificar el despliegue."
+fi
+echo
+
+echo "5. Ledger: consulta para correr contra la base de la instancia"
 cat <<'SQL'
        -- Un run de Foundation Cloud correcto: metered_api, biller aws_bedrock,
        -- tokens > 0 y cost_cents > 0. Si cost_cents = 0 con tokens > 0, el
