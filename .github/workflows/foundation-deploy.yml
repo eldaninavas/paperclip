@@ -14,6 +14,11 @@ on:
         description: Optional previously built commit SHA to redeploy or roll back
         required: false
         type: string
+      keep_development_running:
+        description: Leave development up after the deploy instead of scaling it to zero
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -158,12 +163,26 @@ jobs:
         run: |
           STATUS=$(curl --silent --output /dev/null --write-out '%{http_code}' "$HEALTH_URL")
           test "$STATUS" = "302" || test "$STATUS" = "401"
+      # Development is scaled back down because an idle task still bills, and
+      # the infrastructure budget for this account is about USD 50/month. It is
+      # a cost control, not a deployment step, which is why it runs even when
+      # the deploy failed -- a broken revision must not be left running either.
+      #
+      # Anything that has to exercise the running instance (a Foundation Cloud
+      # run, a ledger check, an S3 round trip) needs dev up after the workflow
+      # ends, so the scale-down is skippable per dispatch rather than by editing
+      # this file. Default is unchanged: dev goes back to zero.
       - name: Scale development back to zero
-        if: always()
+        if: always() && !(github.event_name == 'workflow_dispatch' && inputs.keep_development_running)
         env:
           CLUSTER: foundation
           SERVICE: foundation-dev
         run: aws ecs update-service --cluster "$CLUSTER" --service "$SERVICE" --desired-count 0
+      - name: Report that development was left running
+        if: always() && github.event_name == 'workflow_dispatch' && inputs.keep_development_running
+        run: |
+          echo "::warning::foundation-dev was left at desired-count 1 on purpose."
+          echo "::warning::It bills until the next deploy scales it down, or until you do."
 
   deploy-production:
     if: github.event_name == 'workflow_dispatch' && inputs.deploy_production
