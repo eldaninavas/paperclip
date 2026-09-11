@@ -279,8 +279,18 @@ Resources:
       MaxIterations: 8
       MaxTokens: 4096
       TimeoutSeconds: 300
+      # "@*/pc_*" is MCP-shaped (@server/tool) and matches nothing the runner
+      # actually sends: the completion contract arrives as inline functions
+      # named paperclip_finish / paperclip_block, which have no server segment.
+      # With only that entry the model had no callable tool, burned its eight
+      # iterations and returned max_iterations_exceeded with no content events.
+      #
+      # The service schema allows a bare name (pattern `(\*|@?[^/]+(/[^/]+)?)`),
+      # so the inline contract is expressed without the server prefix. The MCP
+      # entry stays so tools served that way keep working.
       AllowedTools:
         - "@*/pc_*"
+        - "paperclip_*"
       Tools: []
       Skills: []
       EnvironmentVariables: {}
