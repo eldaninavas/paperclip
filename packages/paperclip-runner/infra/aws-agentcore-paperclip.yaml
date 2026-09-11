@@ -14,6 +14,16 @@ Parameters:
     Type: String
     Description: Stable IAM user or role ARN allowed to assume the Paperclip invocation role.
     AllowedPattern: "^arn:aws(-[^:]+)?:iam::[0-9]{12}:(role|user)/.+$"
+  # The runner assumes the invocation role rather than holding Bedrock rights of
+  # its own, so whatever principal runs it has to be trusted here. In a hosted
+  # deployment that is the ECS task role, which is not the operator principal who
+  # provisioned the stack — without this the task cannot assume the role and the
+  # provider fails at its first AWS call.
+  AdditionalTrustedRunnerPrincipalArn:
+    Type: String
+    Default: ""
+    Description: Optional second principal (the hosted ECS task role) allowed to assume the invocation role.
+    AllowedPattern: "^$|^arn:aws(-[^:]+)?:iam::[0-9]{12}:(role|user)/.+$"
   BedrockModelId:
     Type: String
     Default: global.anthropic.claude-sonnet-4-6
@@ -53,6 +63,7 @@ Parameters:
 
 Conditions:
   IsPrivate: !Equals [!Ref DeploymentMode, private]
+  HasAdditionalTrustedPrincipal: !Not [!Equals [!Ref AdditionalTrustedRunnerPrincipalArn, ""]]
 
 Resources:
   ContextEncryptionKey:
@@ -302,7 +313,10 @@ Resources:
         Statement:
           - Effect: Allow
             Principal:
-              AWS: !Ref TrustedRunnerPrincipalArn
+              AWS: !If
+                - HasAdditionalTrustedPrincipal
+                - [!Ref TrustedRunnerPrincipalArn, !Ref AdditionalTrustedRunnerPrincipalArn]
+                - !Ref TrustedRunnerPrincipalArn
             Action: sts:AssumeRole
       Policies:
         - PolicyName: InvokeAndOperatePinnedHarness
