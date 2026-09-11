@@ -2881,7 +2881,11 @@ function OnboardingWizardInner({
                               id: "foundation_cloud",
                               label: "Foundation Cloud",
                               icon: <Cloud className="size-full" />,
-                              tag: "Coming online",
+                              // Says which side the wait is on. "Coming online"
+                              // alone reads as a feature nobody built, and the
+                              // first person to hit this tile asked exactly
+                              // that.
+                              tag: "Esperando a AWS",
                               // Until the native AgentCore path is qualified in
                               // this deployment, a click must not silently fall
                               // through to a customer-supplied API key.
