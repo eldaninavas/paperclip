@@ -271,6 +271,50 @@ Para que yo pueda hacerlo sin ti la próxima vez, añade a
 `arn:aws:iam::523859314550:role/foundation-*-ecs-task`. No es admin: sigue sin
 poder tocar ECS, RDS ni crear roles nuevos.
 
+### PROBADO END-TO-END con un servidor Foundation real (madrugada)
+
+Levanté el servidor Foundation **en local** (Postgres embebido, puerto 3199), que
+no depende del `explicitDeny` de ECS, y recorrí el camino completo de un tenant:
+
+| Paso | Resultado |
+|---|---|
+| Crear company (tenant) | `e0ab997a-…` |
+| Crear perfil AgentCore | `15d344e1-…`, `qualifiedRevision: sha256:5c58cbec…` |
+| Crear agente `paperclip_runner` + `aws_agentcore` | `e745bff3-…` |
+| Invocar un run | seleccionado como **`runtimeMode: native`** |
+| Backend elegido | **`driverKind: aws_agentcore_harness_api`** |
+| Outputs | **3 run logs en S3** bajo `run-logs/<companyId>/<agentId>/<runId>.ndjson` |
+
+**Dos requisitos quedan demostrados, no inferidos:**
+
+1. **Outputs en S3 por tenant.** Logs de runs reales del servidor, con contenido
+   legible, segmentados por company y agente. Ya no se quedan en el disco de la
+   task.
+2. **El perfil AgentCore se crea y se firma.** Esto sólo funciona gracias a la
+   corrección de `qualificationRevision`: antes, el servidor rechazaba cualquier
+   perfil generado desde este stack.
+
+**Dónde se detiene:**
+
+```
+runtimeMode: native · driverKind: aws_agentcore_harness_api
+error: failed to start AWS AgentCore provider:
+       AgentCore context S3 upload failed
+```
+
+El runner asume el rol de invocación (`AssumeRoleProvider`,
+`aws_agentcore_provider.rs:643`) y sube el runtime context al bucket de contexto
+del stack. Falla ahí. Mi usuario local no puede diagnosticarlo del todo:
+`kms:GenerateDataKey` sobre la key del stack le está denegado, así que no puedo
+distinguir entre un permiso que falta en el rol asumido y otra causa. El error
+que emite el provider es genérico (`AWS AgentCore request failed`), sin el
+detalle del SDK.
+
+**Siguiente paso concreto:** repetir este run con trazas del SDK de AWS activas
+(`AWS_SDK_LOAD_CONFIG`/`RUST_LOG=aws_sdk_s3=debug` en el runner) para ver el
+error real de S3/KMS, y comparar con los permisos de
+`paperclip-agentcore-runner-development-us-east-1`.
+
 ### Por qué la verificación final también te necesita a ti
 
 Aunque apliques la política de Bedrock, yo no puedo cerrar el ciclo solo. Dos
