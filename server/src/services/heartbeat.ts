@@ -4679,7 +4679,7 @@ function isExecutionReviewParticipantRecoveryEligibleRun(
   );
 }
 
-function normalizeLedgerBillingType(value: unknown): BillingType {
+export function normalizeLedgerBillingType(value: unknown): BillingType {
   const raw = readNonEmptyString(value);
   switch (raw) {
     case "api":
@@ -4699,7 +4699,7 @@ function normalizeLedgerBillingType(value: unknown): BillingType {
   }
 }
 
-function resolveLedgerBiller(result: AdapterExecutionResult): string {
+export function resolveLedgerBiller(result: AdapterExecutionResult): string {
   return (
     readNonEmptyString(result.biller) ??
     readNonEmptyString(result.provider) ??

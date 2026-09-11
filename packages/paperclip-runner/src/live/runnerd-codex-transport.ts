@@ -2985,7 +2985,37 @@ class DurablePrpCodexTransport implements CodexAppServerTransport {
         throw new Error("runnerd exited before provider startup");
       await new Promise((resolveWait) => setTimeout(resolveWait, 10));
     }
-    throw new Error("runnerd did not report its provider identity");
+    throw new Error(
+      `runnerd did not report its provider identity${this.#waitContext()}`,
+    );
+  }
+
+  /**
+   * What the transport actually observed while a wait ran out.
+   *
+   * A remote provider that answers nothing looks identical to one that was
+   * never asked: both leave the identity wait to expire. AWS AgentCore does
+   * exactly that when Bedrock throttles every model call behind the harness —
+   * the harness returns `max_iterations_exceeded` with no content, and the bare
+   * timeout message sent operators looking for a runnerd bug that was not
+   * there. The diagnostics the far side did emit name the real cause, so carry
+   * them into the error rather than leaving them in evidence nobody reads.
+   */
+  #waitContext(): string {
+    const parts = [`after ${Math.round(resolveCommandTimeoutMs() / 1000)}s`];
+    parts.push(
+      this.#threadId.length > 0
+        ? `thread ${this.#threadId}`
+        : "no provider thread was ever opened",
+    );
+    if (this.#evidence.providerService !== null)
+      parts.push(`provider ${this.#evidence.providerService}`);
+    if (this.#evidence.providerExecutionKind !== null)
+      parts.push(`execution ${this.#evidence.providerExecutionKind}`);
+    const tail = this.#evidence.diagnostics.slice(-3);
+    if (tail.length > 0)
+      parts.push(`last diagnostics: ${tail.join(" | ").slice(-1_024)}`);
+    return ` (${parts.join("; ")})`;
   }
 
   async #waitCommand(type: string, commandId?: string): Promise<void> {
@@ -3014,7 +3044,7 @@ class DurablePrpCodexTransport implements CodexAppServerTransport {
       await new Promise((resolveWait) => setTimeout(resolveWait, 10));
     }
     throw new Error(
-      `${this.#startupComplete ? "provider_transport_failed" : this.#startupFailureCode}: PRP command ${type} timed out`,
+      `${this.#startupComplete ? "provider_transport_failed" : this.#startupFailureCode}: PRP command ${type} timed out${this.#waitContext()}`,
     );
   }
 
