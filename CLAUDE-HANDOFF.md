@@ -62,10 +62,14 @@ en el ledger y en el store, no en el adapter.
 
 ### Lo que falta para usar AgentCore como producción
 
-1. **`qualificationRevision`**: el stack emite `aws-agentcore-harness-context-v2`
-   y todo el código (server TS y runner Rust) exige `aws-agentcore-harness-v1`.
-   Hay que decidir cuál es la buena antes de crear perfiles; no lo toqué porque
-   falsear la atestación sería peor que el bloqueo.
+1. ~~`qualificationRevision`~~ **RESUELTO**. No era una decisión de producto: el
+   commit que añadió el template creó el archivo entero, y
+   `aws-agentcore-harness-context-v2` no aparece en ninguna otra parte del repo,
+   mientras `aws-agentcore-harness-v1` está en el server, el runner Rust y sus
+   tests. Era una cadena huérfana que hacía irreprocesable todo perfil creado
+   desde este stack. Corregido en el template y aplicado al stack de desarrollo
+   con un change set que **no tocó ningún recurso** (`UPDATE_COMPLETE`).
+   El stack ya emite `aws-agentcore-harness-v1`.
 2. **El adapter `paperclip_runner` está excluido del onboarding**
    (`ONBOARDING_EXCLUDED_ADAPTER_TYPES`).
 3. **Un `remote_agent_profile` por company** apuntando al stack.
